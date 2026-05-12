@@ -13,7 +13,6 @@
     "validate:demo-built-package": "pnpm validate:package-artifact && pnpm --filter @file-viewer/demo build"
   },
   "devDependencies": {
-    "@mithya/ui-registry": "github:mithya-team/ui-repository",
     "@types/node": "^22.15.21",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
