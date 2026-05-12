@@ -19,7 +19,9 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "vite build && tsc -p tsconfig.build.json",
+    "build:artifact": "vite build && tsc -p tsconfig.build.json",
+    "build": "npm run build:artifact",
+    "prepare": "npm run build:artifact",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "verify-dist": "node ./scripts/verify-dist.mjs"
