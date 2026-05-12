@@ -2,10 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "declaration": true,
-    "emitDeclarationOnly": false,
+    "emitDeclarationOnly": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": []
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }

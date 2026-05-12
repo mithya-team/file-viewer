@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
+import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
 import { ViewerStatus } from "../primitives/ViewerStatus";
 
 interface PdfRendererProps {
@@ -12,7 +13,7 @@ interface PdfRendererProps {
 }
 
 if (typeof window !== "undefined") {
-  GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+  GlobalWorkerOptions.workerPort = new PdfWorker();
 }
 
 async function renderPdfPage(
@@ -60,12 +61,12 @@ export function PdfRenderer({ blob, page, pageCount, zoom, onError, onPageCountC
 
   return (
     <div className="h-full overflow-auto p-4">
-      <div className="mb-3 text-center text-xs [color:var(--file-viewer-muted,_#64748b)]">
+      <div className="mb-3 text-center text-xs text-(--file-viewer-muted,#64748b)">
         Page {page} / {pageCount}
       </div>
       <canvas
         ref={canvasRef}
-        className="mx-auto rounded [background-color:var(--file-viewer-surface,_#ffffff)] [box-shadow:var(--file-viewer-shadow,_0_1px_2px_rgb(15_23_42_/_0.08))]"
+        className="mx-auto rounded bg-(--file-viewer-surface,#ffffff) [box-shadow:var(--file-viewer-shadow,0_1px_2px_rgb(15_23_42/0.08))]"
       />
       {pageCount === 0 && <ViewerStatus>Loading PDF...</ViewerStatus>}
     </div>
