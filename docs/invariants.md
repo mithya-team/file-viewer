@@ -26,7 +26,7 @@ This file details what not to do when building this library/package.
 - Must select renderers from loaded data, not consumer intent.
 - Must prefer magic-byte sniffing over headers.
 - Must use loaded `Blob.type` or HTTP `Content-Type` only after sniffing.
-- Must use text and CSV heuristics only after binary signatures and content type checks.
+- Must not fall back to text, CSV, or other content heuristics for renderer selection.
 - Must not use filename extensions to select renderers.
 - Must not use consumer-provided MIME props to select renderers.
 - Must not silently treat unknown binary data as text.
@@ -70,7 +70,6 @@ This file details what not to do when building this library/package.
 ## Styling And Theming
 
 - Must use Tailwind classes.
-- Must ship default CSS generated from variables2json `variables.json`.
 - Must keep theme values behind CSS variables.
 - Must allow host apps to override variables with their own generated CSS.
 - Must document required host Tailwind scanning.

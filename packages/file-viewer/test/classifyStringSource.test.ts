@@ -17,4 +17,8 @@ describe("classifyStringSource", () => {
   it("classifies base64 fallback", () => {
     expect(classifyStringSource("SGVsbG8=")).toBe("base64");
   });
+
+  it("rejects ambiguous plain strings", () => {
+    expect(() => classifyStringSource("test")).toThrow("Unsupported string source format.");
+  });
 });

@@ -12,8 +12,12 @@ function hasNullBytes(bytes: Uint8Array): boolean {
   return bytes.some((value) => value === 0);
 }
 
-function decodeSample(bytes: Uint8Array): string {
-  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+function decodeUtf8(bytes: Uint8Array): string | null {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
 }
 
 function inferOpenXmlKind(bytes: Uint8Array): "spreadsheet" | "docx" | null {
@@ -21,6 +25,30 @@ function inferOpenXmlKind(bytes: Uint8Array): "spreadsheet" | "docx" | null {
   if (latin1.includes("xl/")) return "spreadsheet";
   if (latin1.includes("word/")) return "docx";
   return null;
+}
+
+function inferOleSpreadsheet(bytes: Uint8Array): boolean {
+  const latin1 = new TextDecoder("latin1").decode(bytes);
+  return latin1.includes("Workbook") || latin1.includes("Book");
+}
+
+function isPrintableCharacter(codePoint: number) {
+  return codePoint === 0x09 || codePoint === 0x0a || codePoint === 0x0d || (codePoint >= 0x20 && codePoint !== 0x7f);
+}
+
+function isProbablyText(bytes: Uint8Array): boolean {
+  if (bytes.length === 0) return true;
+  if (hasNullBytes(bytes)) return false;
+  const decoded = decodeUtf8(bytes);
+  if (decoded == null || decoded.length === 0) return false;
+
+  let printableCount = 0;
+  for (const character of decoded) {
+    if (isPrintableCharacter(character.codePointAt(0) ?? 0)) {
+      printableCount += 1;
+    }
+  }
+  return printableCount / decoded.length >= 0.85;
 }
 
 const IMAGE_MIME_PREFIX = "image/";
@@ -63,10 +91,13 @@ export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
     return { kind: "image", mimeType: normalizedMime || "image/webp" };
   }
   if (startsWith(sampleBytes, [0xd0, 0xcf, 0x11, 0xe0])) {
-    return {
-      kind: "spreadsheet",
-      mimeType: normalizedMime || "application/vnd.ms-excel",
-    };
+    if (inferOleSpreadsheet(sampleBytes)) {
+      return {
+        kind: "spreadsheet",
+        mimeType: normalizedMime || "application/vnd.ms-excel",
+      };
+    }
+    return { kind: "unsupported", mimeType: normalizedMime || "application/octet-stream" };
   }
   if (startsWith(sampleBytes, [0x50, 0x4b, 0x03, 0x04])) {
     const openXmlKind = inferOpenXmlKind(sampleBytes);
@@ -87,19 +118,8 @@ export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
   if (SPREADSHEET_MIME.has(normalizedMime)) {
     return { kind: "spreadsheet", mimeType: normalizedMime };
   }
-  if (TEXTUAL_MIME.has(normalizedMime) || normalizedMime.startsWith("text/")) {
+  if ((TEXTUAL_MIME.has(normalizedMime) || normalizedMime.startsWith("text/")) && isProbablyText(sampleBytes)) {
     return { kind: "text", mimeType: normalizedMime };
-  }
-
-  if (!hasNullBytes(sampleBytes)) {
-    const previewText = decodeSample(sampleBytes).trim();
-    if (previewText.length > 0) {
-      const likelyCsv = previewText.includes(",") && previewText.includes("\n");
-      if (likelyCsv) {
-        return { kind: "spreadsheet", mimeType: normalizedMime || "text/csv" };
-      }
-      return { kind: "text", mimeType: normalizedMime || "text/plain" };
-    }
   }
 
   return { kind: "unsupported", mimeType: normalizedMime || "application/octet-stream" };

@@ -42,18 +42,27 @@ async function loadStreamSource(
 ): Promise<Blob> {
   const reader = stream.getReader();
   const chunks: ArrayBuffer[] = [];
+  const abortRead = () => {
+    void reader.cancel(signal.reason).catch(() => undefined);
+  };
   try {
+    if (signal.aborted) {
+      abortRead();
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+    signal.addEventListener("abort", abortRead, { once: true });
     while (true) {
+      const { done, value } = await reader.read();
       if (signal.aborted) {
         throw new DOMException("The operation was aborted.", "AbortError");
       }
-      const { done, value } = await reader.read();
       if (done) break;
       if (value != null) {
         chunks.push(toArrayBuffer(value));
       }
     }
   } finally {
+    signal.removeEventListener("abort", abortRead);
     reader.releaseLock();
   }
   return new Blob(chunks);
