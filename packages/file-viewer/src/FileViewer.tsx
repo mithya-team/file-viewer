@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { detectFileKind } from "./detect/detectFileKind";
-import { ViewerButton } from "./primitives/ViewerButton";
+import { FileViewerDefaultChrome } from "./FileViewerDefaultChrome";
 import { ViewerStatus } from "./primitives/ViewerStatus";
 import { DocxRenderer } from "./renderers/DocxRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
@@ -8,19 +8,25 @@ import { PdfRenderer } from "./renderers/PdfRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
 import { TextRenderer } from "./renderers/TextRenderer";
 import { loadSourceToBlob } from "./source/loadSourceToBlob";
-import type { DetectionResult, FileViewerProps } from "./types";
+import type { DetectionResult, FileViewerChromeApi, FileViewerProps } from "./types";
 
 type ViewerState =
   | { status: "loading" }
   | { status: "ready"; blob: Blob; detection: DetectionResult }
-  | { status: "error"; error: Error; reason: "unsupported" | "error" };
+  | { status: "unsupported"; error: Error; detection: DetectionResult & { kind: "unsupported" } }
+  | { status: "error"; error: Error };
 
-type ViewerErrorState = Extract<ViewerState, { status: "error" }>;
+const MIN_PDF_ZOOM = 40;
+const MAX_PDF_ZOOM = 300;
 
 function sourceTypeOf(source: FileViewerProps["source"]): "string" | "blob" | "stream" {
   if (typeof source === "string") return "string";
   if (source instanceof Blob) return "blob";
   return "stream";
+}
+
+function setPdfPageWithinBounds(page: number, pageCount: number) {
+  return Math.min(Math.max(page, 1), Math.max(pageCount, 1));
 }
 
 async function resolveViewerState(source: FileViewerProps["source"], signal: AbortSignal) {
@@ -29,7 +35,112 @@ async function resolveViewerState(source: FileViewerProps["source"], signal: Abo
   return { blob, detection };
 }
 
-export function FileViewer({ source, className, renderFallback, onError }: FileViewerProps) {
+function createChromeApi({
+  detection,
+  downloadUrl,
+  pdfPage,
+  pdfPageCount,
+  pdfZoom,
+  sheetNames,
+  activeSheetIndex,
+  setActiveSheetIndex,
+  setPdfPage,
+  setPdfZoom,
+}: {
+  detection: DetectionResult;
+  downloadUrl: string | null;
+  pdfPage: number;
+  pdfPageCount: number;
+  pdfZoom: number;
+  sheetNames: string[];
+  activeSheetIndex: number;
+  setActiveSheetIndex: (index: number) => void;
+  setPdfPage: (page: number) => void;
+  setPdfZoom: (zoom: number) => void;
+}): FileViewerChromeApi {
+  switch (detection.kind) {
+    case "image":
+      return {
+        file: {
+          kind: "image",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+      };
+    case "pdf":
+      return {
+        file: {
+          kind: "pdf",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+        pdf: {
+          page: pdfPage,
+          pageCount: pdfPageCount,
+          zoom: pdfZoom,
+          canPrev: pdfPage > 1,
+          canNext: pdfPage < pdfPageCount,
+          prevPage: () => setPdfPage(pdfPage - 1),
+          nextPage: () => setPdfPage(pdfPage + 1),
+          setPage: (page) => setPdfPage(page),
+          zoomIn: () => setPdfZoom(pdfZoom + 10),
+          zoomOut: () => setPdfZoom(pdfZoom - 10),
+          setZoom: (zoom) => setPdfZoom(zoom),
+        },
+      };
+    case "spreadsheet":
+      return {
+        file: {
+          kind: "spreadsheet",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+        spreadsheet:
+          detection.mimeType === "text/csv"
+            ? {}
+            : {
+                sheetNames,
+                activeSheetIndex,
+                setActiveSheetIndex,
+              },
+      };
+    case "docx":
+      return {
+        file: {
+          kind: "docx",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+      };
+    case "text":
+      return {
+        file: {
+          kind: "text",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+      };
+    case "unsupported":
+      return {
+        file: {
+          kind: "unsupported",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+      };
+  }
+
+  const exhaustiveCheck: never = detection;
+  return exhaustiveCheck;
+}
+
+export function FileViewer({
+  source,
+  className,
+  chrome = "default",
+  renderFallback,
+  onError,
+}: FileViewerProps) {
   const [state, setState] = useState<ViewerState>({ status: "loading" });
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<Error | null>(null);
@@ -48,7 +159,7 @@ export function FileViewer({ source, className, renderFallback, onError }: FileV
         if (abortController.signal.aborted) return;
         if (detection.kind === "unsupported") {
           const error = new Error("Unsupported file type.");
-          setState({ status: "error", error, reason: "unsupported" });
+          setState({ status: "unsupported", error, detection });
           onError?.(error, { stage: "detect", sourceType });
           return;
         }
@@ -57,7 +168,7 @@ export function FileViewer({ source, className, renderFallback, onError }: FileV
       .catch((unknownError) => {
         if (abortController.signal.aborted) return;
         const error = unknownError instanceof Error ? unknownError : new Error("Failed to load file source.");
-        setState({ status: "error", error, reason: "error" });
+        setState({ status: "error", error });
         onError?.(error, { stage: "load", sourceType });
       });
     return () => {
@@ -75,7 +186,7 @@ export function FileViewer({ source, className, renderFallback, onError }: FileV
   }, [source]);
 
   useEffect(() => {
-    setPdfPage((current) => Math.min(Math.max(current, 1), Math.max(pdfPageCount, 1)));
+    setPdfPage((current) => setPdfPageWithinBounds(current, pdfPageCount));
   }, [pdfPageCount]);
 
   useEffect(() => {
@@ -100,21 +211,26 @@ export function FileViewer({ source, className, renderFallback, onError }: FileV
     };
   }, [state]);
 
-  const errorState = useMemo<ViewerErrorState | null>(() => {
-    if (state.status === "error") return state;
+  const failureState = useMemo(() => {
+    if (state.status === "unsupported") {
+      return { error: state.error, reason: "unsupported" as const };
+    }
+    if (state.status === "error") {
+      return { error: state.error, reason: "error" as const };
+    }
     if (renderError == null) return null;
-    return { status: "error", error: renderError, reason: "error" };
+    return { error: renderError, reason: "error" as const };
   }, [renderError, state]);
 
   const fallback = useMemo(() => {
-    if (errorState == null) return null;
-    if (renderFallback != null) return renderFallback(errorState.reason);
+    if (failureState == null) return null;
+    if (renderFallback != null) return renderFallback(failureState.reason);
     return (
-      <ViewerStatus centered tone={errorState.reason === "error" ? "error" : "default"}>
-        {errorState.reason === "unsupported" ? "Unsupported file type." : errorState.error.message}
+      <ViewerStatus centered tone={failureState.reason === "error" ? "error" : "default"}>
+        {failureState.reason === "unsupported" ? "Unsupported file type." : failureState.error.message}
       </ViewerStatus>
     );
-  }, [errorState, renderFallback]);
+  }, [failureState, renderFallback]);
 
   function handleRenderError(nextError: Error) {
     setRenderError(nextError);
@@ -129,55 +245,31 @@ export function FileViewer({ source, className, renderFallback, onError }: FileV
     });
   }
 
-  const toolbarControls = state.status !== "ready" ? null : (
-    <>
-      {state.detection.kind === "pdf" && (
-        <div className="flex items-center gap-2">
-          <ViewerButton onClick={() => setPdfPage((current) => Math.max(current - 1, 1))} disabled={pdfPage <= 1}>
-            Prev
-          </ViewerButton>
-          <span className="min-w-20 text-center [color:var(--file-viewer-foreground,_#334155)]">
-            Page {pdfPage} / {pdfPageCount}
-          </span>
-          <ViewerButton
-            onClick={() => setPdfPage((current) => Math.min(current + 1, pdfPageCount))}
-            disabled={pdfPage >= pdfPageCount}
-          >
-            Next
-          </ViewerButton>
-          <ViewerButton onClick={() => setPdfZoom((current) => Math.max(current - 10, 40))}>
-            -
-          </ViewerButton>
-          <span className="[color:var(--file-viewer-foreground,_#334155)]">{pdfZoom}%</span>
-          <ViewerButton onClick={() => setPdfZoom((current) => Math.min(current + 10, 300))}>
-            +
-          </ViewerButton>
-        </div>
-      )}
-      {state.detection.kind === "spreadsheet" && sheetNames.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {sheetNames.map((sheetName, index) => (
-            <ViewerButton
-              key={sheetName}
-              onClick={() => setActiveSheetIndex(index)}
-              active={index === activeSheetIndex}
-            >
-              {sheetName}
-            </ViewerButton>
-          ))}
-        </div>
-      )}
-      {objectUrl != null && (
-        <a
-          href={objectUrl}
-          download
-          className="inline-flex items-center justify-center rounded border px-2 py-1 text-xs [border-color:var(--file-viewer-border,_#cbd5e1)] [background-color:var(--file-viewer-surface,_#ffffff)] [color:var(--file-viewer-foreground,_#334155)]"
-        >
-          Download
-        </a>
-      )}
-    </>
-  );
+  const chromeApi = useMemo(() => {
+    if (state.status !== "ready" && state.status !== "unsupported") return null;
+    return createChromeApi({
+      detection: state.detection,
+      downloadUrl: state.status === "ready" ? objectUrl : null,
+      pdfPage,
+      pdfPageCount,
+      pdfZoom,
+      sheetNames,
+      activeSheetIndex,
+      setActiveSheetIndex,
+      setPdfPage: (page) => setPdfPage(setPdfPageWithinBounds(page, pdfPageCount)),
+      setPdfZoom: (zoom) => setPdfZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
+    });
+  }, [activeSheetIndex, objectUrl, pdfPage, pdfPageCount, pdfZoom, sheetNames, state]);
+
+  const chromeContent = useMemo(() => {
+    if (chromeApi == null || chrome === "none") return null;
+    if (chrome === "default") {
+      if (state.status !== "ready") return null;
+      return <FileViewerDefaultChrome api={chromeApi} />;
+    }
+    const ChromeComponent = chrome;
+    return <ChromeComponent api={chromeApi} />;
+  }, [chrome, chromeApi, state.status]);
 
   const readyContent = state.status !== "ready" || renderError != null ? fallback : (
     <>
@@ -209,19 +301,16 @@ export function FileViewer({ source, className, renderFallback, onError }: FileV
 
   return (
     <div
-      className={`flex h-full w-full min-h-0 min-w-0 flex-col rounded border [border-color:var(--file-viewer-border,_#cbd5e1)] [background-color:var(--file-viewer-surface,_#ffffff)] ${className ?? ""}`}
+      className={`flex h-full w-full min-h-0 min-w-0 flex-col rounded border border-(--file-viewer-border,#cbd5e1) bg-(--file-viewer-surface,#ffffff) ${className ?? ""}`}
     >
       {state.status === "loading" && (
         <ViewerStatus centered>Loading file...</ViewerStatus>
       )}
-      {state.status === "error" && fallback}
+      {(state.status === "error" || state.status === "unsupported") && chromeContent}
+      {(state.status === "error" || state.status === "unsupported") && fallback}
       {state.status === "ready" && (
         <>
-          <div className="flex flex-wrap items-center gap-3 border-b px-3 py-2 text-xs [border-color:var(--file-viewer-border,_#cbd5e1)] [background-color:var(--file-viewer-surface-muted,_#f8fafc)] [color:var(--file-viewer-muted,_#64748b)]">
-            <span>{state.detection.kind.toUpperCase()}</span>
-            <span>{state.detection.mimeType || "unknown MIME"}</span>
-            <div className="ml-auto flex flex-wrap items-center gap-2">{toolbarControls}</div>
-          </div>
+          {chromeContent}
           <div className="min-h-0 flex-1">{readyContent}</div>
         </>
       )}

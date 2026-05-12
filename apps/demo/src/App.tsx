@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { FileViewer, type FileViewerSource } from "@file-viewer/react";
+import { DemoViewerChrome } from "./DemoViewerChrome";
 
 type DemoFileType = "text" | "csv" | "image" | "pdf" | "docx" | "dotx" | "xlsx";
 type SourceMode = "url" | "blob" | "base64" | "stream";
 type DemoScenario = "normal" | "unsupported" | "error";
+type ChromeMode = "default" | "none" | "custom";
 
 const FILE_LABELS: Record<DemoFileType, string> = {
   text: "Text",
@@ -134,6 +136,7 @@ export default function App() {
   const [fileType, setFileType] = useState<DemoFileType>("text");
   const [mode, setMode] = useState<SourceMode>("url");
   const [scenario, setScenario] = useState<DemoScenario>("normal");
+  const [chromeMode, setChromeMode] = useState<ChromeMode>("default");
   const [source, setSource] = useState<FileViewerSource | null>(null);
   const [status, setStatus] = useState<string>("Preparing source...");
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +213,25 @@ export default function App() {
     [scenario],
   );
 
+  const chromeButtons = useMemo(
+    () =>
+      (["default", "none", "custom"] as ChromeMode[]).map((nextChromeMode) => (
+        <button
+          key={nextChromeMode}
+          type="button"
+          onClick={() => setChromeMode(nextChromeMode)}
+          className={`w-full rounded-md border px-2 py-1.5 text-left text-xs font-semibold transition ${
+            nextChromeMode === chromeMode
+              ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+              : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
+          }`}
+        >
+          {nextChromeMode}
+        </button>
+      )),
+    [chromeMode],
+  );
+
   return (
     <div className="flex h-dvh bg-slate-50 text-slate-950">
       <main className="min-w-0 flex-1 p-4">
@@ -219,7 +241,7 @@ export default function App() {
               FileViewer demo
             </strong>
             <span>
-              File: {FILE_LABELS[fileType]} | Source: {mode.toUpperCase()} | Scenario: {SCENARIO_LABELS[scenario]} | {status}
+              File: {FILE_LABELS[fileType]} | Source: {mode.toUpperCase()} | Scenario: {SCENARIO_LABELS[scenario]} | Chrome: {chromeMode.toUpperCase()} | {status}
             </span>
           </div>
           {viewerEvent != null && (
@@ -235,6 +257,7 @@ export default function App() {
             ) : resolvedSource != null ? (
               <FileViewer
                 source={resolvedSource}
+                chrome={chromeMode === "custom" ? DemoViewerChrome : chromeMode}
                 onError={(nextError, context) => {
                   setViewerEvent(`${context.stage}: ${nextError.message}`);
                 }}
@@ -287,6 +310,13 @@ export default function App() {
             Source Mode
           </div>
           <div className="grid gap-1.5">{modeButtons}</div>
+        </div>
+
+        <div>
+          <div className="mb-2 text-xs font-bold text-slate-700">
+            Chrome Mode
+          </div>
+          <div className="grid gap-1.5">{chromeButtons}</div>
         </div>
       </aside>
     </div>

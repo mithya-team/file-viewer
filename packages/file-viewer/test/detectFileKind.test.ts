@@ -53,4 +53,12 @@ describe("detectFileKind", () => {
     const result = await detectFileKind(blob);
     expect(result.kind).toBe("unsupported");
   });
+
+  it("does not treat unknown zip payloads as supported openxml formats", async () => {
+    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "ppt/slides/slide1.xml"], {
+      type: "application/zip",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("unsupported");
+  });
 });

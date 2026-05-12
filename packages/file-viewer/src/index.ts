@@ -1,2 +1,8 @@
 export { FileViewer } from "./FileViewer";
-export type { FileViewerErrorContext, FileViewerProps, FileViewerSource } from "./types";
+export type {
+  FileViewerChrome,
+  FileViewerChromeApi,
+  FileViewerErrorContext,
+  FileViewerProps,
+  FileViewerSource,
+} from "./types";

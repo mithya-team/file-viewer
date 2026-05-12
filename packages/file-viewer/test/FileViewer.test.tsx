@@ -1,10 +1,115 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
-import { FileViewer } from "../src";
+import { FileViewer, type FileViewerChromeApi, type FileViewerSource } from "../src";
+import type { DetectionResult } from "../src/types";
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
 }
+
+const {
+  detectFileKindMock,
+  loadSourceToBlobMock,
+  resetMockState,
+  seenPdfBlobs,
+  seenSpreadsheetBlobs,
+} = vi.hoisted(() => {
+  const loadSourceToBlobMock = vi.fn<
+    (source: FileViewerSource, signal: AbortSignal) => Promise<Blob>
+  >();
+  const detectFileKindMock = vi.fn<(blob: Blob) => Promise<DetectionResult>>();
+  const seenPdfBlobs = new WeakSet<Blob>();
+  const seenSpreadsheetBlobs = new WeakSet<Blob>();
+
+  return {
+    loadSourceToBlobMock,
+    detectFileKindMock,
+    seenPdfBlobs,
+    seenSpreadsheetBlobs,
+    resetMockState: () => {
+      loadSourceToBlobMock.mockReset();
+      detectFileKindMock.mockReset();
+    },
+  };
+});
+
+vi.mock("../src/source/loadSourceToBlob", () => ({
+  loadSourceToBlob: loadSourceToBlobMock,
+}));
+
+vi.mock("../src/detect/detectFileKind", () => ({
+  detectFileKind: detectFileKindMock,
+}));
+
+vi.mock("../src/renderers/ImageRenderer", () => ({
+  ImageRenderer: ({
+    objectUrl,
+    onError,
+  }: {
+    objectUrl: string;
+    onError: (error: Error) => void;
+  }) => <img src={objectUrl} alt="Rendered file" onError={() => onError(new Error("Failed to render image."))} />,
+}));
+
+vi.mock("../src/renderers/TextRenderer", () => ({
+  TextRenderer: () => <div data-renderer="text">Text renderer</div>,
+}));
+
+vi.mock("../src/renderers/DocxRenderer", () => ({
+  DocxRenderer: () => <div data-renderer="docx">Docx renderer</div>,
+}));
+
+vi.mock("../src/renderers/PdfRenderer", () => ({
+  PdfRenderer: ({
+    blob,
+    page,
+    zoom,
+    onPageCountChange,
+  }: {
+    blob: Blob;
+    page: number;
+    zoom: number;
+    onPageCountChange: (pageCount: number) => void;
+  }) => {
+    if (!seenPdfBlobs.has(blob)) {
+      seenPdfBlobs.add(blob);
+      queueMicrotask(() => {
+        onPageCountChange(3);
+      });
+    }
+
+    return (
+      <div data-renderer="pdf">
+        PDF renderer page={page} zoom={zoom}
+      </div>
+    );
+  },
+}));
+
+vi.mock("../src/renderers/SpreadsheetRenderer", () => ({
+  SpreadsheetRenderer: ({
+    blob,
+    activeSheetIndex,
+    onSheetNamesChange,
+  }: {
+    blob: Blob;
+    activeSheetIndex: number;
+    onSheetNamesChange: (sheetNames: string[]) => void;
+  }) => {
+    if (!seenSpreadsheetBlobs.has(blob)) {
+      seenSpreadsheetBlobs.add(blob);
+      queueMicrotask(() => {
+        onSheetNamesChange(blob.type === "text/csv" ? [] : ["Sheet A", "Sheet B"]);
+      });
+    }
+
+    return (
+      <div data-renderer="spreadsheet">
+        Spreadsheet renderer sheet={activeSheetIndex}
+      </div>
+    );
+  },
+}));
 
 async function flush() {
   await act(async () => {
@@ -21,15 +126,28 @@ async function waitFor<T>(read: () => T | null, attempts = 20): Promise<T> {
   throw new Error("Timed out waiting for value.");
 }
 
+function findAllByText(renderer: ReactTestRenderer | undefined, text: string) {
+  if (renderer == null) return [];
+  return renderer.root.findAll((node) => node.children.join("") === text);
+}
+
 describe("FileViewer", () => {
-  let renderer: ReactTestRenderer;
+  let renderer: ReactTestRenderer | undefined;
   let originalCreateObjectURL: typeof URL.createObjectURL | undefined;
   let originalRevokeObjectURL: typeof URL.revokeObjectURL | undefined;
   let originalConsoleWarn: typeof console.warn;
   let originalConsoleError: typeof console.error;
 
+  function mockResolvedSource(detection: DetectionResult) {
+    const blob = new Blob(["fixture"], { type: detection.mimeType });
+    loadSourceToBlobMock.mockResolvedValue(blob);
+    detectFileKindMock.mockResolvedValue(detection);
+    return blob;
+  }
+
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    resetMockState();
     originalCreateObjectURL = URL.createObjectURL;
     originalRevokeObjectURL = URL.revokeObjectURL;
     originalConsoleWarn = console.warn;
@@ -56,31 +174,290 @@ describe("FileViewer", () => {
         renderer.unmount();
       });
     }
+    renderer = undefined;
     globalThis.IS_REACT_ACT_ENVIRONMENT = undefined;
     URL.createObjectURL = originalCreateObjectURL as typeof URL.createObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL as typeof URL.revokeObjectURL;
     vi.restoreAllMocks();
   });
 
+  it("renders built-in chrome by default", async () => {
+    mockResolvedSource({
+      kind: "spreadsheet",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" />);
+    });
+
+    const defaultChrome = await waitFor(() => renderer?.root.findAllByProps({ "data-file-viewer-chrome": "default" })[0] ?? null);
+
+    expect(defaultChrome.props["data-file-viewer-chrome"]).toBe("default");
+    expect(findAllByText(renderer, "Sheet A").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Download").length).toBeGreaterThan(0);
+  });
+
+  it("omits built-in chrome when chrome is none", async () => {
+    mockResolvedSource({
+      kind: "pdf",
+      mimeType: "application/pdf",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome="none" />);
+    });
+
+    await waitFor(() => renderer?.root.findAllByProps({ "data-renderer": "pdf" })[0] ?? null);
+
+    expect(renderer?.root.findAllByProps({ "data-file-viewer-chrome": "default" })).toHaveLength(0);
+    expect(findAllByText(renderer, "Download")).toHaveLength(0);
+  });
+
+  it("lets custom chrome drive pdf page and zoom state", async () => {
+    mockResolvedSource({
+      kind: "pdf",
+      mimeType: "application/pdf",
+    });
+
+    function PdfChrome({ api }: { api: FileViewerChromeApi }) {
+      if (api.file.kind !== "pdf") {
+        return <div data-chrome-kind={api.file.kind}>{api.file.kind}</div>;
+      }
+
+      return (
+        <div data-chrome-kind="pdf">
+          <span>{`page:${api.pdf.page}/${api.pdf.pageCount}`}</span>
+          <span>{`zoom:${api.pdf.zoom}`}</span>
+          <button type="button" onClick={api.pdf.nextPage}>
+            Next page
+          </button>
+          <button type="button" onClick={api.pdf.zoomIn}>
+            Zoom in
+          </button>
+          {api.file.downloadUrl != null && <a href={api.file.downloadUrl}>Custom download</a>}
+        </div>
+      );
+    }
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome={PdfChrome} />);
+    });
+
+    await waitFor(() => findAllByText(renderer, "page:1/3")[0] ?? null);
+
+    const nextPageButton = renderer?.root.findAllByType("button").find((button) => button.children.join("") === "Next page");
+    const zoomInButton = renderer?.root.findAllByType("button").find((button) => button.children.join("") === "Zoom in");
+
+    expect(nextPageButton).toBeDefined();
+    expect(zoomInButton).toBeDefined();
+
+    await act(async () => {
+      nextPageButton?.props.onClick();
+      zoomInButton?.props.onClick();
+    });
+
+    expect(findAllByText(renderer, "page:2/3").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "zoom:110").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "PDF renderer page=2 zoom=110").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Custom download").length).toBeGreaterThan(0);
+  });
+
+  it("exposes workbook sheet controls but not csv sheet controls", async () => {
+    function SpreadsheetChrome({ api }: { api: FileViewerChromeApi }) {
+      if (api.file.kind !== "spreadsheet") {
+        return <div data-chrome-kind={api.file.kind}>{api.file.kind}</div>;
+      }
+
+      return (
+        <div data-chrome-kind="spreadsheet">
+          {api.file.mimeType === "text/csv" ? (
+            <span>csv-no-sheet-controls</span>
+          ) : (
+            <>
+              <span>{`sheet-count:${api.spreadsheet.sheetNames?.length ?? 0}`}</span>
+              <button type="button" onClick={() => api.spreadsheet.setActiveSheetIndex?.(1)}>
+                Sheet B
+              </button>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    mockResolvedSource({
+      kind: "spreadsheet",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="workbook" chrome={SpreadsheetChrome} />);
+    });
+
+    await waitFor(() => findAllByText(renderer, "sheet-count:2")[0] ?? null);
+
+    const sheetButton = renderer?.root.findAllByType("button").find((button) => button.children.join("") === "Sheet B");
+    expect(sheetButton).toBeDefined();
+
+    await act(async () => {
+      sheetButton?.props.onClick();
+    });
+
+    expect(findAllByText(renderer, "Spreadsheet renderer sheet=1").length).toBeGreaterThan(0);
+
+    mockResolvedSource({
+      kind: "spreadsheet",
+      mimeType: "text/csv",
+    });
+
+    await act(async () => {
+      renderer?.update(<FileViewer source="csv" chrome={SpreadsheetChrome} />);
+    });
+
+    await waitFor(() => findAllByText(renderer, "csv-no-sheet-controls")[0] ?? null);
+
+    expect(findAllByText(renderer, "sheet-count:2")).toHaveLength(0);
+    expect(findAllByText(renderer, "Sheet B")).toHaveLength(0);
+  });
+
+  it("resets chrome state when the source changes", async () => {
+    mockResolvedSource({
+      kind: "pdf",
+      mimeType: "application/pdf",
+    });
+
+    function ResetChrome({ api }: { api: FileViewerChromeApi }) {
+      if (api.file.kind !== "pdf") {
+        return <div>{api.file.kind}</div>;
+      }
+
+      return (
+        <div>
+          <span>{`page:${api.pdf.page}`}</span>
+          <span>{`zoom:${api.pdf.zoom}`}</span>
+          <button type="button" onClick={api.pdf.nextPage}>
+            Next page
+          </button>
+          <button type="button" onClick={api.pdf.zoomIn}>
+            Zoom in
+          </button>
+        </div>
+      );
+    }
+
+    await act(async () => {
+      renderer = create(<FileViewer source="first" chrome={ResetChrome} />);
+    });
+
+    await waitFor(() => findAllByText(renderer, "page:1")[0] ?? null);
+
+    const nextPageButton = renderer?.root.findAllByType("button").find((button) => button.children.join("") === "Next page");
+    const zoomInButton = renderer?.root.findAllByType("button").find((button) => button.children.join("") === "Zoom in");
+
+    await act(async () => {
+      nextPageButton?.props.onClick();
+      zoomInButton?.props.onClick();
+    });
+
+    expect(findAllByText(renderer, "page:2").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "zoom:110").length).toBeGreaterThan(0);
+
+    mockResolvedSource({
+      kind: "pdf",
+      mimeType: "application/pdf",
+    });
+
+    await act(async () => {
+      renderer?.update(<FileViewer source="second" chrome={ResetChrome} />);
+    });
+
+    await waitFor(() => findAllByText(renderer, "page:1")[0] ?? null);
+
+    expect(findAllByText(renderer, "zoom:100").length).toBeGreaterThan(0);
+  });
+
+  it("shows custom chrome for unsupported detection and routes detect errors through fallback", async () => {
+    const onError = vi.fn();
+    const renderFallback = vi.fn((reason: "unsupported" | "error") => <div data-reason={reason}>Fallback: {reason}</div>);
+
+    mockResolvedSource({
+      kind: "unsupported",
+      mimeType: "application/octet-stream",
+    });
+
+    function UnsupportedChrome({ api }: { api: FileViewerChromeApi }) {
+      return <div data-chrome-kind={api.file.kind}>{api.file.kind}</div>;
+    }
+
+    await act(async () => {
+      renderer = create(
+        <FileViewer
+          source="fixture"
+          chrome={UnsupportedChrome}
+          onError={onError}
+          renderFallback={renderFallback}
+        />,
+      );
+    });
+
+    const fallback = await waitFor(() => renderer?.root.findAllByProps({ "data-reason": "unsupported" })[0] ?? null);
+
+    expect(fallback.children.join("")).toContain("Fallback: unsupported");
+    expect(renderer?.root.findAllByProps({ "data-chrome-kind": "unsupported" })).toHaveLength(1);
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), { stage: "detect", sourceType: "string" });
+  });
+
+  it("routes load failures through fallback and onError without rendering chrome", async () => {
+    const onError = vi.fn();
+    const renderFallback = vi.fn((reason: "unsupported" | "error") => <div data-reason={reason}>Fallback: {reason}</div>);
+
+    loadSourceToBlobMock.mockRejectedValue(new Error("Load failed."));
+
+    function LoadErrorChrome({ api }: { api: FileViewerChromeApi }) {
+      return <div data-chrome-kind={api.file.kind}>{api.file.kind}</div>;
+    }
+
+    await act(async () => {
+      renderer = create(
+        <FileViewer
+          source="fixture"
+          chrome={LoadErrorChrome}
+          onError={onError}
+          renderFallback={renderFallback}
+        />,
+      );
+    });
+
+    const fallback = await waitFor(() => renderer?.root.findAllByProps({ "data-reason": "error" })[0] ?? null);
+
+    expect(fallback.children.join("")).toContain("Fallback: error");
+    expect(renderer?.root.findAllByProps({ "data-chrome-kind": "unsupported" })).toHaveLength(0);
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), { stage: "load", sourceType: "string" });
+  });
+
   it("routes renderer failures through renderFallback and onError", async () => {
     const onError = vi.fn();
     const renderFallback = vi.fn((reason: "unsupported" | "error") => <div data-reason={reason}>Fallback: {reason}</div>);
-    const source = new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" });
 
-    await act(async () => {
-      renderer = create(<FileViewer source={source} onError={onError} renderFallback={renderFallback} />);
+    mockResolvedSource({
+      kind: "image",
+      mimeType: "image/png",
     });
 
-    const image = await waitFor(() => renderer.root.findAllByType("img")[0] ?? null);
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" onError={onError} renderFallback={renderFallback} />);
+    });
+
+    const image = await waitFor(() => renderer?.root.findAllByType("img")[0] ?? null);
 
     await act(async () => {
       image.props.onError();
     });
 
-    const fallback = await waitFor(() => renderer.root.findAllByProps({ "data-reason": "error" })[0] ?? null);
+    const fallback = await waitFor(() => renderer?.root.findAllByProps({ "data-reason": "error" })[0] ?? null);
 
     expect(fallback.children.join("")).toContain("Fallback: error");
     expect(renderFallback).toHaveBeenCalledWith("error");
-    expect(onError).toHaveBeenCalledWith(expect.any(Error), { stage: "render", sourceType: "blob" });
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), { stage: "render", sourceType: "string" });
   });
 });
