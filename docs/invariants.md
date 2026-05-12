@@ -82,10 +82,12 @@ This file details what not to do when building this library/package.
 ## Demo App
 
 - Must place the demo app under `apps/demo`.
+- Must treat the demo as end-to-end package validation, not only a renderer sandbox.
 - Must serve demo files from `apps/demo/public/sample-files`.
 - Must copy existing `sample-files`; do not move or delete originals.
 - Must not generate missing format fixtures unless explicitly approved.
 - Must demonstrate URL, Blob, base64, stream, and error/unsupported flows.
+- Must validate the built artifact shape consumers are expected to install, not only workspace-linked source behavior.
 
 ## Reference Files
 

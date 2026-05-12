@@ -9,7 +9,6 @@
 ## Remaining Work
 
 - Decide publish posture: keep private vs prep for publish. If publish, finalize package metadata and export surface.
-- Expand verification: more `FileViewer` integration tests, renderer smoke tests, demo-level checks.
 - Add publish-focused consumer guidance once the publish posture is decided.
 - Harden runtime behavior: validate SSR-safe import boundaries and improve browser-only failure handling where needed.
 - Revisit performance if needed: heavy parsing can move off main thread later.

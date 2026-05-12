@@ -133,6 +133,8 @@ Consumers must configure Tailwind to scan the package source/classes so library 
 
 The demo app lives at `apps/demo`.
 
+The demo is the package validation harness, not just a renderer playground. It should validate the full package contract end to end, including source modes, renderer behavior, fallback/error paths, and the built artifact shape consumers are expected to install.
+
 Existing files from `sample-files` are copied into `apps/demo/public/sample-files` for Vite serving. The current demo fixture set includes `txt`, `csv`, `jpg`, `pdf`, `docx`, `dotx`, and `xlsx`. Some tooling views may omit binary fixtures; the on-disk demo folder is the source of truth.
 
 Demo layout is a split pane:
@@ -149,6 +151,7 @@ The demo should exercise:
 - Base64 source
 - ReadableStream source
 - Error/unsupported state
+- built package artifact shape expected by consumers
 
 ### Demo Source Preparation Flow
 
@@ -172,14 +175,8 @@ flowchart TD
 
 In URL mode, the demo passes an absolute URL (resolved against `window.location.origin`) to ensure URL classification follows the HTTP(S) string path.
 
-### Human-In-The-Loop Delivery Flow
+Demo validation should cover both fast workspace-linked development and the built package shape that external consumers rely on, so packaging/export/style/worker issues are caught before release.
 
-Renderer implementation and demoing is iterative by design:
-
-1. Build one renderer
-2. Demo that renderer in `apps/demo`
-3. Ask for feedback
-4. Continue only on `build next renderer`; otherwise fix and re-demo
 
 ## Reference Material
 

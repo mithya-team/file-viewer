@@ -160,13 +160,13 @@ Rationale: This keeps review cycles tight and catches issues early before compou
 
 Consequence: If feedback is not `build next renderer`, the next action is fix/re-demo rather than starting the next renderer.
 
-### 21. Demo Package Is First-Class Workspace App
+### 21. Demo Is The Package Validation Harness
 
-Decision: The demo runs as `@file-viewer/demo` under `apps/demo` and consumes `@file-viewer/react` through workspace linking.
+Decision: The demo runs as `@file-viewer/demo` under `apps/demo`, uses workspace linking for fast local development, and should also validate the built artifact shape consumers are expected to install.
 
-Rationale: This keeps package integration realistic and validates install/use paths continuously.
+Rationale: Workspace linking keeps iteration fast while built-artifact validation catches packaging, exports, styling, and worker issues that source-linked development can miss.
 
-Consequence: Workspace wiring (`pnpm-workspace.yaml`, package names, scripts) is part of baseline architecture, not optional setup.
+Consequence: Workspace wiring (`pnpm-workspace.yaml`, package names, scripts) is part of baseline architecture, not optional setup, but the demo should not be treated as sufficient unless it also covers consumer-facing built package behavior.
 
 ### 22. Demo should also use Tailwind
 
