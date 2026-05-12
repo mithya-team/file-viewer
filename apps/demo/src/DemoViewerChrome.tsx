@@ -4,14 +4,19 @@ interface DemoViewerChromeProps {
   api: FileViewerChromeApi;
 }
 
+type DemoPdfChromeApi = Extract<FileViewerChromeApi, { file: { kind: "pdf" } }>;
+type DemoSpreadsheetChromeApi = Extract<FileViewerChromeApi, { file: { kind: "spreadsheet" } }>;
+
 export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-t-lg border-b border-slate-300 bg-slate-900 px-3 py-2 text-xs text-slate-100">
       <span className="font-semibold uppercase tracking-wide">
         {api.file.kind}
       </span>
-      <span className="text-slate-300">{api.file.mimeType || "unknown MIME"}</span>
-      {api.file.kind === "pdf" && (
+      <span className="text-slate-300">
+        {api.file.mimeType || "unknown MIME"}
+      </span>
+      {isPDFChromeApi(api) && (
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -21,7 +26,9 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
           >
             Prev
           </button>
-          <span>{api.pdf.page} / {api.pdf.pageCount}</span>
+          <span>
+            {api.pdf.page} / {api.pdf.pageCount}
+          </span>
           <button
             type="button"
             onClick={api.pdf.nextPage}
@@ -47,14 +54,12 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
           </button>
         </div>
       )}
-      {api.file.kind === "spreadsheet" && (
+      {isSpreadSheetChromeApi(api) && (
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {api.file.mimeType === "text/csv" ? (
-            <span className="text-slate-300">
-              CSV has no workbook controls
-            </span>
+            <span className="text-slate-300">CSV has no workbook controls</span>
           ) : (
-            api.spreadsheet.sheetNames?.map((sheetName, index) => (
+            api.spreadsheet.sheetNames?.map((sheetName: string, index: number) => (
               <button
                 key={sheetName}
                 type="button"
@@ -83,3 +88,13 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
     </div>
   );
 }
+
+const isPDFChromeApi = (api: FileViewerChromeApi): api is DemoPdfChromeApi => {
+  return api.file.kind === "pdf";
+};
+
+const isSpreadSheetChromeApi = (
+  api: FileViewerChromeApi,
+): api is DemoSpreadsheetChromeApi => {
+  return api.file.kind === "spreadsheet";
+};

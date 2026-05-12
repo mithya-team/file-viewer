@@ -4,13 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm --dir ../../packages/file-viewer build",
     "dev": "vite",
+    "prebuild": "pnpm --dir ../../packages/file-viewer build",
     "build": "vite build",
+    "pretypecheck": "pnpm --dir ../../packages/file-viewer build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --dir ../../packages/file-viewer build",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@file-viewer/react": "workspace:*",
+    "@file-viewer/react": "file:../../packages/file-viewer",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

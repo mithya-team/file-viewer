@@ -4,7 +4,17 @@ React file viewer with one `FileViewer` component and content-driven renderer se
 
 ## Install
 
-Current repo validation uses workspace linking via `@file-viewer/demo`.
+GitHub install with pnpm:
+
+```bash
+pnpm add "github:<owner>/<repo>#<ref>&path:/packages/file-viewer"
+```
+
+Repo-local validation in this monorepo uses a built package dependency:
+
+```json
+"@file-viewer/react": "file:../../packages/file-viewer"
+```
 
 Package name:
 
@@ -12,7 +22,12 @@ Package name:
 @file-viewer/react
 ```
 
-Publish/Git install guidance is still pending the repo's publish posture.
+Peer dependencies:
+
+- `react`
+- `react-dom`
+
+The package ships built JS/types plus its packaged PDF worker. Consumers should not import from package `src` or copy worker files into app `public`.
 
 ## Import
 
@@ -146,13 +161,21 @@ Examples:
 
 ## Tailwind
 
-Host apps need to scan the package classes so viewer styles are emitted.
+Host apps need to scan the installed package classes so viewer styles are emitted. There is no separate package CSS import right now.
 
-Example:
+Tailwind v4:
+
+```css
+@import "tailwindcss";
+
+@source "../node_modules/@file-viewer/react/dist";
+```
+
+Tailwind v3-style `content` example:
 
 ```ts
 content: [
   "./src/**/*.{ts,tsx}",
-  "./node_modules/@file-viewer/react/**/*.{js,ts,jsx,tsx}",
+  "./node_modules/@file-viewer/react/dist/**/*.{js,ts,jsx,tsx}",
 ];
 ```

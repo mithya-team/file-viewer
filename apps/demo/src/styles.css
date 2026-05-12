@@ -1,3 +1,3 @@
 @import "tailwindcss";
 
-@source "../../../packages/file-viewer/src";
+@source "../../../node_modules/@file-viewer/react/dist";
