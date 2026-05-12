@@ -1,0 +1,20 @@
+{
+  "name": "file-viewer",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "dev:demo": "pnpm --filter @file-viewer/react build && pnpm --filter @file-viewer/demo dev",
+    "dev:playground": "pnpm --filter @file-viewer/react build && pnpm --filter @file-viewer/demo dev"
+  },
+  "devDependencies": {
+    "@mithya/ui-registry": "github:mithya-team/ui-repository",
+    "@types/node": "^22.15.21",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
