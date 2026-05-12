@@ -8,8 +8,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "dev:demo": "pnpm --filter @file-viewer/react build && pnpm --filter @file-viewer/demo dev",
-    "dev:playground": "pnpm --filter @file-viewer/react build && pnpm --filter @file-viewer/demo dev"
+    "dev:demo": "pnpm --filter @file-viewer/demo dev"
   },
   "devDependencies": {
     "@mithya/ui-registry": "github:mithya-team/ui-repository",

@@ -3,6 +3,7 @@ import { FileViewer, type FileViewerSource } from "@file-viewer/react";
 
 type DemoFileType = "text" | "csv" | "image" | "pdf" | "docx" | "dotx" | "xlsx";
 type SourceMode = "url" | "blob" | "base64" | "stream";
+type DemoScenario = "normal" | "unsupported" | "error";
 
 const FILE_LABELS: Record<DemoFileType, string> = {
   text: "Text",
@@ -24,6 +25,14 @@ const FILE_PATHS: Record<DemoFileType, string> = {
   xlsx: "/sample-files/Label%20Report%20-%20Anti-assignment,%20CIC%20(Group%203).xlsx",
 };
 
+const SCENARIO_LABELS: Record<DemoScenario, string> = {
+  normal: "Normal",
+  unsupported: "Unsupported",
+  error: "Error",
+};
+const UNSUPPORTED_BYTES = new Uint8Array([0xff, 0xfe, 0xfd, 0xfc]);
+const UNSUPPORTED_BASE64 = "AAECAwQF";
+
 async function toBase64FromBytes(bytes: Uint8Array): Promise<string> {
   let binary = "";
   const chunkSize = 0x8000;
@@ -41,10 +50,61 @@ function toAbsoluteFixtureUrl(path: string): string {
   return new URL(path, window.location.origin).toString();
 }
 
+function createStreamFromBytes(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
+function createFailingStream(): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.error(new Error("Demo stream failure."));
+    },
+  });
+}
+
+function buildUnsupportedSource(mode: SourceMode): FileViewerSource {
+  switch (mode) {
+    case "url":
+      return `data:application/octet-stream;base64,${UNSUPPORTED_BASE64}`;
+    case "blob":
+      return new Blob([UNSUPPORTED_BYTES], { type: "application/octet-stream" });
+    case "base64":
+      return UNSUPPORTED_BASE64;
+    case "stream":
+      return createStreamFromBytes(UNSUPPORTED_BYTES);
+  }
+}
+
+function buildErrorSource(mode: SourceMode): FileViewerSource {
+  switch (mode) {
+    case "url":
+      return "https://example.com/failure";
+    case "base64":
+      return "definitely not a valid viewer source";
+    case "stream":
+      return createFailingStream();
+    case "blob":
+      throw new Error("Forced error flow is only available for URL, Base64, or Stream mode.");
+  }
+}
+
 async function buildSource(
   fileType: DemoFileType,
   mode: SourceMode,
+  scenario: DemoScenario,
 ): Promise<FileViewerSource> {
+  if (scenario === "unsupported") {
+    return buildUnsupportedSource(mode);
+  }
+  if (scenario === "error") {
+    return buildErrorSource(mode);
+  }
+
   const path = FILE_PATHS[fileType];
   const absoluteUrl = toAbsoluteFixtureUrl(path);
   if (mode === "url") return absoluteUrl;
@@ -73,9 +133,11 @@ async function buildSource(
 export default function App() {
   const [fileType, setFileType] = useState<DemoFileType>("text");
   const [mode, setMode] = useState<SourceMode>("url");
+  const [scenario, setScenario] = useState<DemoScenario>("normal");
   const [source, setSource] = useState<FileViewerSource | null>(null);
   const [status, setStatus] = useState<string>("Preparing source...");
   const [error, setError] = useState<string | null>(null);
+  const [viewerEvent, setViewerEvent] = useState<string | null>(null);
 
   const resolvedSource = useMemo(() => {
     if (mode !== "url") return source;
@@ -87,7 +149,8 @@ export default function App() {
     let active = true;
     setStatus("Preparing source...");
     setError(null);
-    void buildSource(fileType, mode)
+    setViewerEvent(null);
+    void buildSource(fileType, mode, scenario)
       .then((nextSource) => {
         if (!active) return;
         setSource(nextSource);
@@ -105,7 +168,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [fileType, mode]);
+  }, [fileType, mode, scenario]);
 
   const modeButtons = useMemo(
     () =>
@@ -128,6 +191,25 @@ export default function App() {
     [mode],
   );
 
+  const scenarioButtons = useMemo(
+    () =>
+      (["normal", "unsupported", "error"] as DemoScenario[]).map((nextScenario) => (
+        <button
+          key={nextScenario}
+          type="button"
+          onClick={() => setScenario(nextScenario)}
+          className={`w-full rounded-md border px-2 py-1.5 text-left text-xs font-semibold transition ${
+            nextScenario === scenario
+              ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+              : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
+          }`}
+        >
+          {SCENARIO_LABELS[nextScenario]}
+        </button>
+      )),
+    [scenario],
+  );
+
   return (
     <div className="flex h-dvh bg-slate-50 text-slate-950">
       <main className="min-w-0 flex-1 p-4">
@@ -137,17 +219,31 @@ export default function App() {
               FileViewer demo
             </strong>
             <span>
-              File: {FILE_LABELS[fileType]} | Source: {mode.toUpperCase()} |{" "}
-              {status}
+              File: {FILE_LABELS[fileType]} | Source: {mode.toUpperCase()} | Scenario: {SCENARIO_LABELS[scenario]} | {status}
             </span>
           </div>
+          {viewerEvent != null && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {viewerEvent}
+            </div>
+          )}
           <div className="min-h-0 flex-1">
             {error != null ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                 {error}
               </div>
             ) : resolvedSource != null ? (
-              <FileViewer source={resolvedSource} />
+              <FileViewer
+                source={resolvedSource}
+                onError={(nextError, context) => {
+                  setViewerEvent(`${context.stage}: ${nextError.message}`);
+                }}
+                renderFallback={(reason) => (
+                  <div className="flex h-full items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Demo fallback: {reason}
+                  </div>
+                )}
+              />
             ) : (
               <div className="text-[13px] text-slate-500">
                 Preparing source...
@@ -177,6 +273,13 @@ export default function App() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <div className="mb-2 text-xs font-bold text-slate-700">
+            Scenario
+          </div>
+          <div className="grid gap-1.5">{scenarioButtons}</div>
         </div>
 
         <div>
