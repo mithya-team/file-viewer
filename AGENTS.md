@@ -10,7 +10,7 @@ A React-based file-viewer library that provides a single `FileViewer` component 
 - **Architecture:** 
     1. Consumer provides `source` (URL, Blob, or Stream).
     2. Internal `SourceLoader` buffers data to a `Blob`.
-    3. `MimeDetector` identifies the format using magic bytes and heuristics.
+ 3. `MimeDetector` identifies the format using magic bytes first, then loaded MIME/header data.
     4. `Router` selects the appropriate internal renderer.
 
 ## Directory Structure
@@ -33,7 +33,7 @@ A React-based file-viewer library that provides a single `FileViewer` component 
 
 1. **Public API:** Only expose `FileViewer` and public types. Renderers must remain internal.
 2. **Source Prop:** Accept exactly one `source` prop: `string | Blob | ReadableStream<Uint8Array>`.
-3. **Renderer Selection:** MUST be content-driven (magic bytes). NEVER use filename extensions or consumer-provided MIME types for routing.
+3. **Renderer Selection:** MUST be content-driven (magic bytes first, loaded MIME/header data second). NEVER use filename extensions, consumer-provided MIME types, or text/csv content heuristics for routing.
 4. **Data Handling:** All sources must be buffered to a `Blob` before rendering (no progressive rendering in v1).
 5. **Workers:** Use package-owned bundler-managed module workers (e.g., for PDF/Spreadsheet). Avoid hardcoded paths.
 6. **Mithya UI:** Treat `@mithya/ui-registry` as a dev-time tool. Copy/generate primitives into `src/primitives`. Do not import runtime components from the registry.

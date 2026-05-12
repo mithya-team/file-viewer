@@ -8,6 +8,7 @@ This file details what not to do when building this library/package.
 - Must accept one `source` prop as the public data input.
 - Must not add parallel source props like `url`, `blob`, `base64`, `streamUrl`, or `mimeTypeForRenderer`.
 - Must not require consumers to choose a renderer.
+- Must allow consumers to hide built-in viewer chrome or replace it with consumer-owned chrome.
 - Must not export individual renderers as public API in v1.
 - Must not add custom renderer registration in v1.
 
@@ -35,6 +36,7 @@ This file details what not to do when building this library/package.
 ## Format Scope
 
 - Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, and text files in v1.
+- Must treat `txt` and `csv` support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic routing.
 - Must render `dotx` through the DOCX path only.
 - Must not execute template behavior, embedded actions, macros, scripts, or external document side effects.
 - Must not implement PPTX in v1.

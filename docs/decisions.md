@@ -18,11 +18,11 @@ Consequence: Ambiguous strings are handled best-effort. Rendering still depends 
 
 ### 3. Renderer Selection Is Content-Driven
 
-Decision: Renderer selection uses loaded data: magic bytes first, loaded `Blob.type` or HTTP `Content-Type` second, text/CSV heuristics last.
+Decision: Renderer selection uses loaded data: magic bytes first, loaded `Blob.type` or HTTP `Content-Type` second.
 
-Rationale: Consumers should not be able to force the wrong renderer with props or filenames.
+Rationale: Consumers should not be able to force the wrong renderer with props or filenames, and unsupported data should fail closed instead of being guessed into text or CSV.
 
-Consequence: Filename extensions and consumer-provided MIME values are metadata only, not routing inputs.
+Consequence: Filename extensions and consumer-provided MIME values are metadata only, not routing inputs. Text/CSV heuristics are not routing inputs either.
 
 ### 4. All Sources Buffer Before Rendering
 
@@ -56,13 +56,13 @@ Rationale: MIME-driven routing is a core package invariant.
 
 Consequence: Custom renderer registration is future work.
 
-### 8. Built-In Toolbar Is Included
+### 8. Built-In Toolbar Is Optional
 
-Decision: `FileViewer` includes a simple built-in toolbar for search, page controls, zoom, and open/download actions where supported.
+Decision: `FileViewer` exposes one `chrome` prop. It supports built-in chrome with `"default"`, content-only mode with `"none"`, and host-owned chrome with a component that receives `FileViewerChromeApi`.
 
-Rationale: The package should be usable without consumers composing their own viewer chrome.
+Rationale: The package should be usable out of the box, but it also needs to support content-only embeds and host-owned chrome without exposing internal renderers.
 
-Consequence: Toolbar state should support controlled and uncontrolled usage where needed.
+Consequence: Viewer state stays in the package shell and is surfaced through a discriminated `FileViewerChromeApi`. Spreadsheet chrome branches on `file.kind === "spreadsheet"` and then `file.mimeType`, since CSV has no workbook-level controls.
 
 ### 9. Errors Use Fallback UI And Callback
 
@@ -74,11 +74,11 @@ Consequence: Renderer errors should not be thrown to React error boundaries by d
 
 ### 10. Styling Uses Tailwind And Figma Variables
 
-Decision: The package uses Tailwind classes and ships default CSS generated from variables2json `variables.json`.
+Decision: The package uses Tailwind classes and CSS variable fallbacks. A separate packaged CSS/tokens artifact is deferred until there is a concrete need.
 
-Rationale: This matches the design-system workflow and keeps theme tokens portable.
+Rationale: This keeps the current package surface smaller while preserving a path to ship shared tokens later if needed.
 
-Consequence: Host apps can override variables with their own generated CSS.
+Consequence: Host apps still own Tailwind scanning. Shared CSS/token packaging stays optional follow-up work, not a current requirement.
 
 ### 11. Host Tailwind Scans Library Classes
 
@@ -110,7 +110,7 @@ Decision: Create a Vite demo app at `apps/demo`.
 
 Rationale: The workspace already includes `apps/*`.
 
-Consequence: Existing sample files are copied to `apps/demo/public/sample-files`. Missing formats wait for user-provided fixtures.
+Consequence: Existing sample files are copied to `apps/demo/public/sample-files`, including the current `txt`, `csv`, `jpg`, `pdf`, `docx`, `dotx`, and `xlsx` fixtures. Some tooling views may omit binary fixtures, so the on-disk folder is the source of truth.
 
 ### 15. `sample-renderers` Is Reference-Only
 
