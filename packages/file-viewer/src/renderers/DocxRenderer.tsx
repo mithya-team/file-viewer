@@ -1,19 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { renderAsync } from "docx-preview";
+import { ViewerStatus } from "../primitives/ViewerStatus";
 
 interface DocxRendererProps {
   blob: Blob;
+  onError: (error: Error) => void;
 }
 
-export function DocxRenderer({ blob }: DocxRendererProps) {
+export function DocxRenderer({ blob, onError }: DocxRendererProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     const host = hostRef.current;
     if (host == null) return;
     host.replaceChildren();
+    setIsLoading(true);
     void renderAsync(blob, host, undefined, {
       inWrapper: true,
       breakPages: true,
@@ -21,22 +24,20 @@ export function DocxRenderer({ blob }: DocxRendererProps) {
     })
       .then(() => {
         if (!active) return;
-        setError(null);
+        setIsLoading(false);
       })
       .catch(() => {
         if (!active) return;
-        setError("Failed to render DOCX/DOTX.");
+        onError(new Error("Failed to render DOCX/DOTX."));
       });
     return () => {
       active = false;
     };
-  }, [blob]);
+  }, [blob, onError]);
 
-  if (error != null) {
-    return <div className="p-4 text-sm text-red-600">{error}</div>;
-  }
   return (
-    <div className="h-full overflow-auto bg-slate-50 p-4">
+    <div className="h-full overflow-auto p-4 [background-color:var(--file-viewer-surface-muted,_#f8fafc)]">
+      {isLoading && <ViewerStatus>Rendering document...</ViewerStatus>}
       <div ref={hostRef} />
     </div>
   );

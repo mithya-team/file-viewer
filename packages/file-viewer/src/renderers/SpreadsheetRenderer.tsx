@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
+import { ViewerStatus } from "../primitives/ViewerStatus";
 
 interface SpreadsheetRendererProps {
   blob: Blob;
+  activeSheetIndex: number;
+  onError: (error: Error) => void;
+  onSheetNamesChange: (sheetNames: string[]) => void;
 }
 
 type SheetData = {
@@ -10,10 +14,26 @@ type SheetData = {
   rows: string[][];
 };
 
-export function SpreadsheetRenderer({ blob }: SpreadsheetRendererProps) {
+function parseWorkbook(buffer: ArrayBuffer) {
+  const workbook = XLSX.read(buffer, { type: "array" });
+  return workbook.SheetNames.map((name) => {
+    const worksheet = workbook.Sheets[name];
+    const rawRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
+      header: 1,
+      blankrows: false,
+    });
+    const rows = rawRows.map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
+    return { name, rows };
+  });
+}
+
+export function SpreadsheetRenderer({
+  blob,
+  activeSheetIndex,
+  onError,
+  onSheetNamesChange,
+}: SpreadsheetRendererProps) {
   const [sheets, setSheets] = useState<SheetData[]>([]);
-  const [activeSheetIndex, setActiveSheetIndex] = useState(0);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -21,66 +41,43 @@ export function SpreadsheetRenderer({ blob }: SpreadsheetRendererProps) {
       .arrayBuffer()
       .then((buffer) => {
         if (!active) return;
-        const workbook = XLSX.read(buffer, { type: "array" });
-        const nextSheets = workbook.SheetNames.map((name) => {
-          const worksheet = workbook.Sheets[name];
-          const rawRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
-            header: 1,
-            blankrows: false,
-          });
-          const rows = rawRows.map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
-          return { name, rows };
-        });
+        const nextSheets = parseWorkbook(buffer);
         setSheets(nextSheets);
-        setActiveSheetIndex(0);
-        setError(null);
+        onSheetNamesChange(nextSheets.map((sheet) => sheet.name));
       })
       .catch(() => {
         if (!active) return;
-        setError("Failed to parse spreadsheet.");
+        onSheetNamesChange([]);
+        onError(new Error("Failed to parse spreadsheet."));
       });
     return () => {
       active = false;
     };
-  }, [blob]);
+  }, [blob, onError, onSheetNamesChange]);
 
-  if (error != null) return <div className="p-4 text-sm text-red-600">{error}</div>;
-  if (sheets.length === 0) return <div className="p-4 text-sm text-slate-500">No spreadsheet rows.</div>;
+  if (sheets.length === 0) return <ViewerStatus>Loading spreadsheet...</ViewerStatus>;
 
   const activeSheet = sheets[Math.min(activeSheetIndex, sheets.length - 1)];
   const maxColumns = activeSheet.rows.reduce((max, row) => Math.max(max, row.length), 0);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
-        {sheets.map((sheet, index) => (
-          <button
-            key={sheet.name}
-            type="button"
-            onClick={() => setActiveSheetIndex(index)}
-            className={`rounded border px-2 py-1 text-xs ${
-              index === activeSheetIndex ? "border-slate-400 bg-slate-100 text-slate-900" : "border-slate-200 bg-white text-slate-700"
-            }`}
-          >
-            {sheet.name}
-          </button>
-        ))}
-      </div>
-      <div className="h-full overflow-auto p-3">
-        <table className="w-full border-collapse text-left text-xs">
-          <tbody>
-            {activeSheet.rows.map((row, rowIndex) => (
-              <tr key={`${activeSheet.name}-${rowIndex}`}>
-                {Array.from({ length: maxColumns }, (_, colIndex) => (
-                  <td key={colIndex} className="border border-slate-200 px-2 py-1 align-top text-slate-700">
-                    {row[colIndex] ?? ""}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="h-full overflow-auto p-3">
+      <table className="w-full border-collapse text-left text-xs">
+        <tbody>
+          {activeSheet.rows.map((row, rowIndex) => (
+            <tr key={`${activeSheet.name}-${rowIndex}`}>
+              {Array.from({ length: maxColumns }, (_, colIndex) => (
+                <td
+                  key={colIndex}
+                  className="border px-2 py-1 align-top [border-color:var(--file-viewer-border,_#cbd5e1)] [color:var(--file-viewer-foreground,_#334155)]"
+                >
+                  {row[colIndex] ?? ""}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

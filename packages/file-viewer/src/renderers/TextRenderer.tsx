@@ -1,37 +1,46 @@
 import { useEffect, useState } from "react";
+import { ViewerStatus } from "../primitives/ViewerStatus";
 
 interface TextRendererProps {
   blob: Blob;
+  onError: (error: Error) => void;
 }
 
-export function TextRenderer({ blob }: TextRendererProps) {
+async function readTextContent(blob: Blob) {
+  return blob.text();
+}
+
+export function TextRenderer({ blob, onError }: TextRendererProps) {
   const [value, setValue] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    blob
-      .text()
+    setIsLoading(true);
+    void readTextContent(blob)
       .then((text) => {
         if (!active) return;
         setValue(text);
-        setError(null);
+        setIsLoading(false);
       })
       .catch(() => {
         if (!active) return;
-        setError("Failed to parse text content.");
+        onError(new Error("Failed to parse text content."));
       });
     return () => {
       active = false;
     };
-  }, [blob]);
+  }, [blob, onError]);
 
-  if (error != null) {
-    return <div className="p-4 text-sm text-red-600">{error}</div>;
-  }
   return (
     <div className="h-full overflow-auto p-4">
-      <pre className="whitespace-pre-wrap break-words font-mono text-sm text-slate-700">{value}</pre>
+      {isLoading ? (
+        <ViewerStatus>Loading text...</ViewerStatus>
+      ) : (
+        <pre className="whitespace-pre-wrap wrap-break-word font-mono text-sm [color:var(--file-viewer-foreground,_#334155)]">
+          {value}
+        </pre>
+      )}
     </div>
   );
 }

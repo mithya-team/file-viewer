@@ -1,11 +1,17 @@
 interface ImageRendererProps {
   objectUrl: string;
+  onError: (error: Error) => void;
 }
 
-export function ImageRenderer({ objectUrl }: ImageRendererProps) {
+export function ImageRenderer({ objectUrl, onError }: ImageRendererProps) {
   return (
-    <div className="flex h-full items-center justify-center overflow-auto bg-slate-50 p-4">
-      <img src={objectUrl} alt="Rendered file" className="max-h-full max-w-full rounded shadow-sm" />
+    <div className="flex h-full items-center justify-center overflow-auto p-4 bg-(--file-viewer-surface-muted,#f8fafc)">
+      <img
+        src={objectUrl}
+        alt="Rendered file"
+        className="max-h-full max-w-full rounded [box-shadow:var(--file-viewer-shadow,0_1px_2px_rgb(15_23_42/0.08))]"
+        onError={() => onError(new Error("Failed to render image."))}
+      />
     </div>
   );
 }

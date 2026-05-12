@@ -1,103 +1,73 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist";
+import { ViewerStatus } from "../primitives/ViewerStatus";
 
 interface PdfRendererProps {
   blob: Blob;
+  page: number;
+  pageCount: number;
+  zoom: number;
+  onError: (error: Error) => void;
+  onPageCountChange: (pageCount: number) => void;
 }
 
 if (typeof window !== "undefined") {
   GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 }
 
-export function PdfRenderer({ blob }: PdfRendererProps) {
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [zoom, setZoom] = useState(100);
-  const [error, setError] = useState<string | null>(null);
+async function renderPdfPage(
+  blob: Blob,
+  page: number,
+  zoom: number,
+  canvas: HTMLCanvasElement,
+  onPageCountChange: (pageCount: number) => void,
+) {
+  const data = await blob.arrayBuffer();
+  const loadingTask = getDocument({ data });
+  const document = await loadingTask.promise;
+  try {
+    onPageCountChange(document.numPages);
+    const clampedPage = Math.min(page, document.numPages);
+    const pdfPage = await document.getPage(clampedPage);
+    const viewport = pdfPage.getViewport({ scale: zoom / 100 });
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const context = canvas.getContext("2d");
+    if (context == null) {
+      throw new Error("Failed to get PDF canvas context.");
+    }
+    await pdfPage.render({ canvasContext: context, viewport }).promise;
+  } finally {
+    await document.destroy();
+  }
+}
+
+export function PdfRenderer({ blob, page, pageCount, zoom, onError, onPageCountChange }: PdfRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     let active = true;
-    const run = async () => {
-      try {
-        const data = await blob.arrayBuffer();
-        const loadingTask = getDocument({ data });
-        const document = await loadingTask.promise;
-        if (!active) {
-          await document.destroy();
-          return;
-        }
-        setPages(document.numPages);
-        const clampedPage = Math.min(page, document.numPages);
-        const pdfPage = await document.getPage(clampedPage);
-        const viewport = pdfPage.getViewport({ scale: zoom / 100 });
-        const canvas = canvasRef.current;
-        if (canvas == null) return;
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const context = canvas.getContext("2d");
-        if (context == null) return;
-        await pdfPage.render({ canvasContext: context, viewport }).promise;
-        await document.destroy();
-        setError(null);
-      } catch {
-        if (!active) return;
-        setError("Failed to render PDF.");
-      }
-    };
-    void run();
+    const canvas = canvasRef.current;
+    if (canvas == null) return;
+    void renderPdfPage(blob, page, zoom, canvas, onPageCountChange).catch(() => {
+      if (!active) return;
+      onError(new Error("Failed to render PDF."));
+    });
     return () => {
       active = false;
     };
-  }, [blob, page, zoom]);
+  }, [blob, page, zoom, onError, onPageCountChange]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs">
-        <button
-          type="button"
-          className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
-          onClick={() => setPage((old) => Math.max(old - 1, 1))}
-          disabled={page <= 1}
-        >
-          Prev
-        </button>
-        <span className="min-w-20 text-center">
-          Page {page} / {pages}
-        </span>
-        <button
-          type="button"
-          className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
-          onClick={() => setPage((old) => Math.min(old + 1, pages))}
-          disabled={page >= pages}
-        >
-          Next
-        </button>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            className="rounded border border-slate-300 px-2 py-1"
-            onClick={() => setZoom((old) => Math.max(old - 10, 40))}
-          >
-            -
-          </button>
-          <span>{zoom}%</span>
-          <button
-            type="button"
-            className="rounded border border-slate-300 px-2 py-1"
-            onClick={() => setZoom((old) => Math.min(old + 10, 300))}
-          >
-            +
-          </button>
-        </div>
+    <div className="h-full overflow-auto p-4">
+      <div className="mb-3 text-center text-xs [color:var(--file-viewer-muted,_#64748b)]">
+        Page {page} / {pageCount}
       </div>
-      <div className="h-full overflow-auto p-4">
-        {error != null ? (
-          <div className="text-sm text-red-600">{error}</div>
-        ) : (
-          <canvas ref={canvasRef} className="mx-auto rounded bg-white shadow-sm" />
-        )}
-      </div>
+      <canvas
+        ref={canvasRef}
+        className="mx-auto rounded [background-color:var(--file-viewer-surface,_#ffffff)] [box-shadow:var(--file-viewer-shadow,_0_1px_2px_rgb(15_23_42_/_0.08))]"
+      />
+      {pageCount === 0 && <ViewerStatus>Loading PDF...</ViewerStatus>}
     </div>
   );
 }
