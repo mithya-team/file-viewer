@@ -27,44 +27,49 @@ type ChromeFileBase<K extends FileKind> = {
   mimeType: string;
   downloadUrl: string | null;
 };
-
-export type FileViewerChromeApi =
-  | {
-      file: ChromeFileBase<"image">;
-    }
-  | {
-      file: ChromeFileBase<"pdf">;
-      pdf: {
-        page: number;
-        pageCount: number;
-        zoom: number;
-        canPrev: boolean;
-        canNext: boolean;
-        prevPage: () => void;
-        nextPage: () => void;
-        setPage: (page: number) => void;
-        zoomIn: () => void;
-        zoomOut: () => void;
-        setZoom: (zoom: number) => void;
-      };
-    }
-  | {
-      file: ChromeFileBase<"spreadsheet">;
-      spreadsheet: {
-        sheetNames?: string[];
-        activeSheetIndex?: number;
-        setActiveSheetIndex?: (index: number) => void;
-      };
-    }
-  | {
+export type ImageChromeApi = {
+  file: ChromeFileBase<"image">;
+};
+export type PDFChromeApi = {
+  file: ChromeFileBase<"pdf">;
+  pdf: {
+    page: number;
+    pageCount: number;
+    zoom: number;
+    canPrev: boolean;
+    canNext: boolean;
+    prevPage: () => void;
+    nextPage: () => void;
+    setPage: (page: number) => void;
+    zoomIn: () => void;
+    zoomOut: () => void;
+    setZoom: (zoom: number) => void;
+  };
+};
+export type SpreadsheetChromeApi = {
+  file: ChromeFileBase<"spreadsheet">;
+  spreadsheet: {
+    sheetNames?: string[];
+    activeSheetIndex?: number;
+    setActiveSheetIndex?: (index: number) => void;
+  };
+};
+export type DocxChromeApi = {
       file: ChromeFileBase<"docx">;
     }
-  | {
+export type TextChromeApi = {
       file: ChromeFileBase<"text">;
     }
-  | {
+export type UnsupportedChromeApi = {
       file: ChromeFileBase<"unsupported">;
     };
+export type FileViewerChromeApi =
+  | ImageChromeApi
+  | PDFChromeApi
+  | SpreadsheetChromeApi
+  | DocxChromeApi
+  | TextChromeApi
+  | UnsupportedChromeApi
 
 export type FileViewerChrome =
   | "default"
