@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { detectFileKind } from "./detect/detectFileKind";
 import { FileViewerDefaultChrome } from "./FileViewerDefaultChrome";
 import { ViewerStatus } from "./primitives/ViewerStatus";
@@ -149,6 +149,8 @@ export function FileViewer({
   const [pdfZoom, setPdfZoom] = useState(100);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -160,7 +162,7 @@ export function FileViewer({
         if (detection.kind === "unsupported") {
           const error = new Error("Unsupported file type.");
           setState({ status: "unsupported", error, detection });
-          onError?.(error, { stage: "detect", sourceType });
+          onErrorRef.current?.(error, { stage: "detect", sourceType });
           return;
         }
         setState({ status: "ready", blob, detection });
@@ -169,12 +171,12 @@ export function FileViewer({
         if (abortController.signal.aborted) return;
         const error = unknownError instanceof Error ? unknownError : new Error("Failed to load file source.");
         setState({ status: "error", error });
-        onError?.(error, { stage: "load", sourceType });
+        onErrorRef.current?.(error, { stage: "load", sourceType });
       });
     return () => {
       abortController.abort();
     };
-  }, [source, onError]);
+  }, [source]);
 
   useEffect(() => {
     setRenderError(null);
