@@ -21,21 +21,27 @@ const {
   resetMockState,
   seenPdfBlobs,
   seenSpreadsheetBlobs,
+  pdfRendererTestState,
 } = vi.hoisted(() => {
   const loadSourceToBlobMock =
     vi.fn<(source: FileViewerSource, signal: AbortSignal) => Promise<Blob>>();
   const detectFileKindMock = vi.fn<(blob: Blob) => Promise<DetectionResult>>();
   const seenPdfBlobs = new WeakSet<Blob>();
   const seenSpreadsheetBlobs = new WeakSet<Blob>();
+  const pdfRendererTestState = {
+    renderError: null as Error | null,
+  };
 
   return {
     loadSourceToBlobMock,
     detectFileKindMock,
     seenPdfBlobs,
     seenSpreadsheetBlobs,
+    pdfRendererTestState,
     resetMockState: () => {
       loadSourceToBlobMock.mockReset();
       detectFileKindMock.mockReset();
+      pdfRendererTestState.renderError = null;
     },
   };
 });
@@ -77,17 +83,27 @@ vi.mock("../src/renderers/PdfRenderer", () => ({
     blob,
     page,
     zoom,
+    onError,
     onPageCountChange,
   }: {
     blob: Blob;
     page: number;
     zoom: number;
+    onError: (error: Error) => void;
     onPageCountChange: (pageCount: number) => void;
   }) => {
     if (!seenPdfBlobs.has(blob)) {
       seenPdfBlobs.add(blob);
       queueMicrotask(() => {
         onPageCountChange(3);
+      });
+    }
+
+    if (pdfRendererTestState.renderError != null) {
+      const error = pdfRendererTestState.renderError;
+      pdfRendererTestState.renderError = null;
+      queueMicrotask(() => {
+        onError(error);
       });
     }
 
@@ -518,6 +534,112 @@ describe("FileViewer", () => {
       stage: "load",
       sourceType: "string",
     });
+  });
+
+  it("shows pdf render errors in fallback and forwards them through onError", async () => {
+    const onError = vi.fn();
+    pdfRendererTestState.renderError = new Error("Corrupt PDF.");
+
+    mockResolvedSource({
+      kind: "pdf",
+      mimeType: "application/pdf",
+    });
+
+    await act(async () => {
+      renderer = create(
+        <FileViewer
+          source="fixture"
+          chrome="none"
+          onError={onError}
+        />,
+      );
+    });
+
+    await waitFor(() => findAllByText(renderer, "Corrupt PDF.")[0] ?? null);
+
+    expect(
+      renderer?.root.findAllByProps({ "data-renderer": "pdf" }),
+    ).toHaveLength(0);
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Corrupt PDF." }),
+      { stage: "render", sourceType: "string" },
+    );
+  });
+
+  it("clears pdf render errors when page or zoom changes", async () => {
+    pdfRendererTestState.renderError = new Error("Corrupt PDF.");
+
+    mockResolvedSource({
+      kind: "pdf",
+      mimeType: "application/pdf",
+    });
+
+    function PdfRetryChrome({ api }: { api: FileViewerChromeApi }) {
+      if (!isPDFChromeApi(api)) return null;
+
+      return (
+        <div>
+          <button type="button" onClick={api.pdf.nextPage}>
+            Next page
+          </button>
+          <button type="button" onClick={api.pdf.zoomIn}>
+            Zoom in
+          </button>
+        </div>
+      );
+    }
+
+    await act(async () => {
+      renderer = create(
+        <FileViewer source="fixture" chrome={PdfRetryChrome} />,
+      );
+    });
+
+    await waitFor(() => findAllByText(renderer, "Corrupt PDF.")[0] ?? null);
+
+    const nextPageButton = renderer?.root
+      .findAllByType("button")
+      .find((button) => button.children.join("") === "Next page");
+
+    await act(async () => {
+      nextPageButton?.props.onClick();
+    });
+
+    await waitFor(
+      () =>
+        renderer?.root.findAllByProps({ "data-renderer": "pdf" })[0] ?? null,
+    );
+
+    expect(findAllByText(renderer, "Corrupt PDF.")).toHaveLength(0);
+    expect(
+      findAllByText(renderer, "PDF renderer page=2 zoom=100").length,
+    ).toBeGreaterThan(0);
+
+    pdfRendererTestState.renderError = new Error("Corrupt PDF.");
+
+    await act(async () => {
+      renderer?.update(<FileViewer source="fixture" chrome={PdfRetryChrome} />);
+    });
+
+    await waitFor(() => findAllByText(renderer, "Corrupt PDF.")[0] ?? null);
+
+    const zoomInButton = renderer?.root
+      .findAllByType("button")
+      .find((button) => button.children.join("") === "Zoom in");
+
+    await act(async () => {
+      zoomInButton?.props.onClick();
+    });
+
+    await waitFor(
+      () =>
+        renderer?.root.findAllByProps({ "data-renderer": "pdf" })[0] ?? null,
+    );
+
+    expect(findAllByText(renderer, "Corrupt PDF.")).toHaveLength(0);
+    expect(
+      findAllByText(renderer, "PDF renderer page=2 zoom=110").length,
+    ).toBeGreaterThan(0);
   });
 
   it("routes renderer failures through renderFallback and onError", async () => {
