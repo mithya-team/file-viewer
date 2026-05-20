@@ -25,30 +25,47 @@ The package ships built JS/types plus its packaged PDF worker. Do not import fro
 
 Consumer setup requirements:
 
-- render `FileViewer` in client/browser runtime
-- give the viewer a sized container or parent height context
-- make Tailwind scan the installed package classes
+- render `FileViewer` in client/browser runtime (e.g. `"use client"` in Next.js)
+- give the viewer a **bounded height** in a flex or grid layout (`min-h-0` on flex ancestors)
+- configure Tailwind to scan package utilities (see below)
 
-There is no separate package CSS import right now.
+### Tailwind
 
-Tailwind v4:
+The package ships Tailwind class names in JS; they are not in your app source. Import the package scan entry from your global CSS.
+
+**Tailwind v4 (recommended):**
+
+```css
+/* src/styles.css (or app entry CSS) */
+@import "tailwindcss";
+@import "@file-viewer/react/styles.css";
+```
+
+`@file-viewer/react/styles.css` scans `dist` plus a small inline safelist for utilities composed in string constants (scrollports, PDF text layer, etc.).
+
+**Alternative (manual scan only):**
 
 ```css
 @import "tailwindcss";
 
 @source "../node_modules/@file-viewer/react/dist";
+@source inline("absolute inset-0 overflow-auto overflow-hidden");
 ```
 
-Tailwind v3-style `content` example:
+If scrollbars or PDF layout look wrong, you are likely missing utilities — use `@import "@file-viewer/react/styles.css"` instead.
+
+**Tailwind v3:** add the package bundle to `content`:
 
 ```ts
 content: [
   "./src/**/*.{ts,tsx}",
-  "./node_modules/@file-viewer/react/dist/**/*.{js,ts,jsx,tsx}",
+  "./node_modules/@file-viewer/react/dist/**/*.{js}",
 ];
 ```
 
-Basic usage:
+### Layout
+
+`FileViewer` uses `h-full` and an internal `relative` content slot; renderers scroll inside `absolute inset-0 overflow-auto` viewports. The parent chain must supply a real height and allow flex children to shrink.
 
 ```tsx
 "use client";
@@ -57,14 +74,18 @@ import { FileViewer, type FileViewerSource } from "@file-viewer/react";
 
 export function Example({ source }: { source: FileViewerSource }) {
   return (
-    <div className="h-[640px] min-h-0">
-      <FileViewer source={source} />
+    <div className="flex h-[640px] min-h-0 flex-col">
+      <FileViewer className="min-h-0 flex-1" source={source} />
     </div>
   );
 }
 ```
 
-`FileViewer` renders with `h-full w-full`, so if the viewer collapses, give its wrapper an explicit height.
+Fixed height (`h-[640px]`) or flex fill (`flex-1 min-h-0` inside a sized parent) both work. Without `min-h-0` on flex ancestors, content may clip without scrolling.
+
+### Basic usage
+
+Same as above — pass exactly one `source` (see [Source](#source)).
 
 ## Source
 
@@ -84,6 +105,8 @@ String sources are classified in this order:
 URL-like string sources are loaded with `fetch`. Remote URLs need to be reachable from the browser and compatible with normal CORS behavior.
 
 All source types are buffered to a `Blob` before rendering.
+
+**`ReadableStream` notes:** a stream can only be read once. Reuse the same stream instance across remounts (e.g. React Strict Mode) is handled inside the package, but prefer passing a `Blob` or URL when possible. If you build a stream from `fetch().body`, do not pass that body to multiple viewers without teeing or refetching.
 
 ## Supported Files
 

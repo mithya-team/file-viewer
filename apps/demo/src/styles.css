@@ -1,11 +1,5 @@
 @import "tailwindcss";
+@import "@file-viewer/react/styles.css";
 
-/* Scan library source (dev) and built dist (linked package). */
+/* Workspace dev: also scan package source for HMR before dist rebuild. */
 @source "../../../packages/file-viewer/src";
-@source "../../../node_modules/@file-viewer/react/dist";
-
-/* Layout utilities used only via JS constants in the package bundle. */
-@source inline("absolute inset-0 overflow-auto overflow-hidden overflow-x-auto");
-@source inline("whitespace-pre-wrap wrap-break-word break-words");
-@source inline("pointer-events-none pointer-events-auto absolute inset-0 z-0 z-10");
-@source inline("block shrink-0 mx-auto max-h-none max-w-none leading-none");

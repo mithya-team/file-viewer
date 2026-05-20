@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* Tailwind v4 scan targets for @file-viewer/react (import from app global CSS). */
+@source "./dist";
 
-/* Tailwind scan target for @file-viewer/react utility classes. */
-@source "./src";
+/* Utilities often composed in JS string constants; dist scan can miss some. */
+@source inline("absolute inset-0 overflow-auto overflow-hidden overflow-x-auto");
+@source inline("whitespace-pre-wrap wrap-break-word break-words");
+@source inline("pointer-events-none pointer-events-auto z-0 z-10");
+@source inline("block shrink-0 mx-auto max-h-none max-w-none leading-none");
+@source inline("textLayer forced-color-adjust-none");
