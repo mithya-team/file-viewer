@@ -7,10 +7,11 @@ import { RENDERER_VIEWPORT_CLASS } from "../rendererViewport";
  *
  * - Container: absolute inset-0, pointer-events-auto, `--scale-factor` set before render
  * - pdf.js sets per-span position via inline styles during TextLayer.render()
+ * - Spans use `white-space: pre` (not pre-wrap) — each run is single-line; wrapping overlaps lines
  * - Word segments: `pdf-word-seg` class only when search is active
  */
 export const TEXT_LAYER_CONTAINER_CLASS =
-  "textLayer pointer-events-auto absolute inset-0 z-10 overflow-hidden opacity-100 leading-none [text-size-adjust:none] forced-color-adjust-none [&_span]:absolute [&_br]:absolute [&_span]:whitespace-pre-wrap [&_span]:break-words [&_span]:transform-origin-[0_0] [&_*::selection]:bg-blue-500/25 [&_br::selection]:bg-transparent";
+  "textLayer pointer-events-auto absolute inset-0 z-10 overflow-hidden opacity-100 leading-none [text-size-adjust:none] forced-color-adjust-none [&_span]:absolute [&_br]:absolute [&_:is(span,br)]:whitespace-pre [&_:is(span,br)]:text-transparent [&_span]:transform-origin-[0_0] [&_*::selection]:bg-blue-500/25 [&_br::selection]:bg-transparent";
 
 export const PDF_PAGE_SLOT_CLASS =
   "relative mx-auto shrink-0 rounded bg-(--file-viewer-surface,#ffffff) [box-shadow:var(--file-viewer-shadow,0_1px_2px_rgb(15_23_42/0.08))]";
