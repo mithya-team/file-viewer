@@ -6,4 +6,8 @@
 @source inline("whitespace-pre-wrap wrap-break-word break-words");
 @source inline("pointer-events-none pointer-events-auto z-0 z-10");
 @source inline("block shrink-0 mx-auto max-h-none max-w-none leading-none");
-@source inline("textLayer forced-color-adjust-none");
+@source inline("textLayer forced-color-adjust-none opacity-100 [text-size-adjust:none]");
+@source inline("[&_span]:absolute [&_br]:absolute [&_span]:whitespace-pre-wrap [&_span]:break-words [&_span]:transform-origin-[0_0]");
+@source inline("[&_*::selection]:bg-blue-500/25 [&_br::selection]:bg-transparent");
+@source inline("relative rounded flex w-full flex-col items-center bg-transparent");
+@source inline("bg-(--file-viewer-surface,#ffffff) [box-shadow:var(--file-viewer-shadow,0_1px_2px_rgb(15_23_42/0.08))]");
