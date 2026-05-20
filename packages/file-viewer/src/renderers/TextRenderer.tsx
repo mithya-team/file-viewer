@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ViewerStatus } from "../primitives/ViewerStatus";
+import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
 interface TextRendererProps {
   blob: Blob;
@@ -33,7 +34,7 @@ export function TextRenderer({ blob, onError }: TextRendererProps) {
   }, [blob, onError]);
 
   return (
-    <div className="h-full overflow-auto p-4">
+    <div className={`${RENDERER_VIEWPORT_CLASS} p-4`}>
       {isLoading ? (
         <ViewerStatus>Loading text...</ViewerStatus>
       ) : (

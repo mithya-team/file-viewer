@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { renderAsync } from "docx-preview";
 import { ViewerStatus } from "../primitives/ViewerStatus";
+import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
 interface DocxRendererProps {
   blob: Blob;
@@ -36,7 +37,9 @@ export function DocxRenderer({ blob, onError }: DocxRendererProps) {
   }, [blob, onError]);
 
   return (
-    <div className="h-full overflow-auto p-4 [background-color:var(--file-viewer-surface-muted,_#f8fafc)]">
+    <div
+      className={`${RENDERER_VIEWPORT_CLASS} p-4 [background-color:var(--file-viewer-surface-muted,_#f8fafc)]`}
+    >
       {isLoading && <ViewerStatus>Rendering document...</ViewerStatus>}
       <div ref={hostRef} />
     </div>

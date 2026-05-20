@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
 import { ViewerStatus } from "../primitives/ViewerStatus";
+import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
 interface SpreadsheetRendererProps {
   blob: Blob;
@@ -61,7 +62,7 @@ export function SpreadsheetRenderer({
   const maxColumns = activeSheet.rows.reduce((max, row) => Math.max(max, row.length), 0);
 
   return (
-    <div className="h-full overflow-auto p-3">
+    <div className={`${RENDERER_VIEWPORT_CLASS} p-3`}>
       <table className="w-full border-collapse text-left text-xs">
         <tbody>
           {activeSheet.rows.map((row, rowIndex) => (

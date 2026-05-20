@@ -1,3 +1,5 @@
+import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
+
 interface ImageRendererProps {
   objectUrl: string;
   onError: (error: Error) => void;
@@ -5,7 +7,9 @@ interface ImageRendererProps {
 
 export function ImageRenderer({ objectUrl, onError }: ImageRendererProps) {
   return (
-    <div className="flex h-full items-center justify-center overflow-auto p-4 bg-(--file-viewer-surface-muted,#f8fafc)">
+    <div
+      className={`${RENDERER_VIEWPORT_CLASS} flex items-center justify-center p-4 bg-(--file-viewer-surface-muted,#f8fafc)`}
+    >
       <img
         src={objectUrl}
         alt="Rendered file"

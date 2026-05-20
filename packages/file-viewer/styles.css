@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Tailwind scan target for @file-viewer/react utility classes. */
+@source "./src";
