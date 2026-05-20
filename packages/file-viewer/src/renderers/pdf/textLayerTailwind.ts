@@ -10,7 +10,7 @@ import { RENDERER_VIEWPORT_CLASS } from "../rendererViewport";
  * - Word segments: `pdf-word-seg` class only when search is active
  */
 export const TEXT_LAYER_CONTAINER_CLASS =
-  "textLayer pointer-events-auto absolute inset-0 z-10 overflow-hidden opacity-100 leading-none [text-size-adjust:none] forced-color-adjust-none [&_span]:text-transparent";
+  "textLayer pointer-events-auto absolute inset-0 z-10 overflow-hidden opacity-100 leading-none [text-size-adjust:none] forced-color-adjust-none";
 
 export const PDF_PAGE_SLOT_CLASS =
   "relative mx-auto shrink-0 rounded bg-(--file-viewer-surface,#ffffff) [box-shadow:var(--file-viewer-shadow,0_1px_2px_rgb(15_23_42/0.08))]";
