@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileViewer, type FileViewerSource } from "@file-viewer/react";
 import { DemoViewerChrome } from "./DemoViewerChrome";
-
-type DemoFileType = "text" | "csv" | "image" | "pdf" | "docx" | "dotx" | "xlsx";
-type SourceMode = "url" | "blob" | "base64" | "stream";
-type DemoScenario = "normal" | "unsupported" | "error";
-type ChromeMode = "default" | "none" | "custom";
+import {
+  readDemoControlsFromLocation,
+  replaceDemoControlsInLocation,
+  type ChromeMode,
+  type DemoControls,
+  type DemoFileType,
+  type DemoScenario,
+  type SourceMode,
+} from "./demoUrlParams";
 
 const FILE_LABELS: Record<DemoFileType, string> = {
   text: "Text",
@@ -121,26 +125,34 @@ async function buildSource(
   if (mode === "blob") {
     return response.blob();
   }
+  const bytes = new Uint8Array(await response.arrayBuffer());
   if (mode === "stream") {
-    if (response.body == null) {
-      throw new Error("ReadableStream is not available for this response.");
-    }
-    return response.body;
+    return createStreamFromBytes(bytes);
   }
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
   return toBase64FromBytes(bytes);
 }
 
 export default function App() {
-  const [fileType, setFileType] = useState<DemoFileType>("text");
-  const [mode, setMode] = useState<SourceMode>("url");
-  const [scenario, setScenario] = useState<DemoScenario>("normal");
-  const [chromeMode, setChromeMode] = useState<ChromeMode>("default");
+  const [controls, setControls] = useState<DemoControls>(readDemoControlsFromLocation);
+  const { fileType, mode, scenario, chromeMode } = controls;
   const [source, setSource] = useState<FileViewerSource | null>(null);
   const [status, setStatus] = useState<string>("Preparing source...");
   const [error, setError] = useState<string | null>(null);
   const [viewerEvent, setViewerEvent] = useState<string | null>(null);
+
+  const applyControls = useCallback((next: DemoControls) => {
+    setControls(next);
+    replaceDemoControlsInLocation(next);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setControls(readDemoControlsFromLocation());
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const resolvedSource = useMemo(() => {
     if (mode !== "url") return source;
@@ -180,7 +192,7 @@ export default function App() {
           <button
             key={sourceMode}
             type="button"
-            onClick={() => setMode(sourceMode)}
+            onClick={() => applyControls({ ...controls, mode: sourceMode })}
             className={`w-full rounded-md border px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
               sourceMode === mode
                 ? "border-slate-400 bg-slate-200 text-slate-950"
@@ -191,7 +203,7 @@ export default function App() {
           </button>
         ),
       ),
-    [mode],
+    [applyControls, controls, mode],
   );
 
   const scenarioButtons = useMemo(
@@ -200,7 +212,7 @@ export default function App() {
         <button
           key={nextScenario}
           type="button"
-          onClick={() => setScenario(nextScenario)}
+          onClick={() => applyControls({ ...controls, scenario: nextScenario })}
           className={`w-full rounded-md border px-2 py-1.5 text-left text-xs font-semibold transition ${
             nextScenario === scenario
               ? "border-slate-900 bg-slate-900 text-white shadow-sm"
@@ -210,7 +222,7 @@ export default function App() {
           {SCENARIO_LABELS[nextScenario]}
         </button>
       )),
-    [scenario],
+    [applyControls, controls, scenario],
   );
 
   const chromeButtons = useMemo(
@@ -219,7 +231,7 @@ export default function App() {
         <button
           key={nextChromeMode}
           type="button"
-          onClick={() => setChromeMode(nextChromeMode)}
+          onClick={() => applyControls({ ...controls, chromeMode: nextChromeMode })}
           className={`w-full rounded-md border px-2 py-1.5 text-left text-xs font-semibold transition ${
             nextChromeMode === chromeMode
               ? "border-slate-900 bg-slate-900 text-white shadow-sm"
@@ -229,13 +241,13 @@ export default function App() {
           {nextChromeMode}
         </button>
       )),
-    [chromeMode],
+    [applyControls, chromeMode, controls],
   );
 
   return (
     <div className="flex h-dvh bg-slate-50 text-slate-950">
-      <main className="min-w-0 flex-1 p-4">
-        <div className="flex h-full flex-col gap-3">
+      <main className="min-h-0 min-w-0 flex-1 p-4">
+        <div className="flex h-full min-h-0 flex-col gap-3">
           <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
             <strong className="font-semibold text-slate-950">
               FileViewer demo
@@ -249,13 +261,14 @@ export default function App() {
               {viewerEvent}
             </div>
           )}
-          <div className="min-h-0 flex-1">
+          <div className="relative min-h-0 flex-1">
             {error != null ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                 {error}
               </div>
             ) : resolvedSource != null ? (
               <FileViewer
+                className="absolute inset-0 min-h-0"
                 source={resolvedSource}
                 chrome={chromeMode === "custom" ? DemoViewerChrome : chromeMode}
                 onError={(nextError, context) => {
@@ -285,7 +298,7 @@ export default function App() {
               <button
                 key={nextType}
                 type="button"
-                onClick={() => setFileType(nextType)}
+                onClick={() => applyControls({ ...controls, fileType: nextType })}
                 className={`w-full rounded-md border px-2 py-1.5 text-left text-xs font-semibold transition ${
                   nextType === fileType
                     ? "border-slate-900 bg-slate-900 text-white shadow-sm"

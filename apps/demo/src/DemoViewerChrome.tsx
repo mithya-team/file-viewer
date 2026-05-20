@@ -22,7 +22,7 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
             type="button"
             onClick={api.pdf.prevPage}
             disabled={!api.pdf.canPrev}
-            className="rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:opacity-50"
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Prev
           </button>
@@ -33,14 +33,14 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
             type="button"
             onClick={api.pdf.nextPage}
             disabled={!api.pdf.canNext}
-            className="rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:opacity-50"
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Next
           </button>
           <button
             type="button"
             onClick={api.pdf.zoomOut}
-            className="rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
           >
             -
           </button>
@@ -48,7 +48,7 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
           <button
             type="button"
             onClick={api.pdf.zoomIn}
-            className="rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
           >
             +
           </button>
@@ -64,7 +64,7 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
                 key={sheetName}
                 type="button"
                 onClick={() => api.spreadsheet.setActiveSheetIndex?.(index)}
-                className={`rounded border px-2 py-1 text-slate-100 transition ${
+                className={`cursor-pointer rounded border px-2 py-1 text-slate-100 transition ${
                   index === api.spreadsheet.activeSheetIndex
                     ? "border-slate-200 bg-slate-700"
                     : "border-slate-600 hover:border-slate-400"
@@ -80,7 +80,7 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
         <a
           href={api.file.downloadUrl}
           download
-          className="ml-auto rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
+          className="ml-auto cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
         >
           Download
         </a>
