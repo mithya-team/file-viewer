@@ -36,36 +36,47 @@ async function loadStringSource(value: string, signal: AbortSignal): Promise<Blo
   }
 }
 
-async function loadStreamSource(
-  stream: ReadableStream<Uint8Array>,
-  signal: AbortSignal,
-): Promise<Blob> {
+/**
+ * Streams are single-use. Reuse one in-flight/completed blob read per stream instance
+ * (e.g. React Strict Mode remount) instead of calling getReader() again on a drained stream.
+ */
+const streamBlobLoads = new WeakMap<ReadableStream<Uint8Array>, Promise<Blob>>();
+
+async function readStreamToBlob(stream: ReadableStream<Uint8Array>): Promise<Blob> {
   const reader = stream.getReader();
   const chunks: ArrayBuffer[] = [];
-  const abortRead = () => {
-    void reader.cancel(signal.reason).catch(() => undefined);
-  };
   try {
-    if (signal.aborted) {
-      abortRead();
-      throw new DOMException("The operation was aborted.", "AbortError");
-    }
-    signal.addEventListener("abort", abortRead, { once: true });
     while (true) {
       const { done, value } = await reader.read();
-      if (signal.aborted) {
-        throw new DOMException("The operation was aborted.", "AbortError");
-      }
       if (done) break;
       if (value != null) {
         chunks.push(toArrayBuffer(value));
       }
     }
   } finally {
-    signal.removeEventListener("abort", abortRead);
     reader.releaseLock();
   }
   return new Blob(chunks);
+}
+
+async function loadStreamSource(
+  stream: ReadableStream<Uint8Array>,
+  signal: AbortSignal,
+): Promise<Blob> {
+  if (signal.aborted) {
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
+
+  let shared = streamBlobLoads.get(stream);
+  if (shared == null) {
+    shared = readStreamToBlob(stream);
+    streamBlobLoads.set(stream, shared);
+    void shared.catch(() => {
+      streamBlobLoads.delete(stream);
+    });
+  }
+
+  return shared;
 }
 
 export async function loadSourceToBlob(

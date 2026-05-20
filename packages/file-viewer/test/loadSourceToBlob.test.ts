@@ -7,19 +7,34 @@ describe("loadSourceToBlob", () => {
     expect(await blob.text()).toBe("Hello");
   });
 
-  it("cancels stale stream reads on abort", async () => {
-    let cancelCalled = false;
+  it("serializes overlapping reads on the same stream", async () => {
     const stream = new ReadableStream<Uint8Array>({
-      cancel() {
-        cancelCalled = true;
+      start(controller) {
+        controller.enqueue(new Uint8Array([65]));
+        controller.close();
+      },
+    });
+
+    await expect(
+      Promise.all([
+        loadSourceToBlob(stream, new AbortController().signal),
+        loadSourceToBlob(stream, new AbortController().signal),
+      ]),
+    ).resolves.toBeDefined();
+  });
+
+  it("rejects when the load signal is already aborted", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([65]));
+        controller.close();
       },
     });
     const abortController = new AbortController();
-    const loadPromise = loadSourceToBlob(stream, abortController.signal);
-
     abortController.abort();
 
-    await expect(loadPromise).rejects.toMatchObject({ name: "AbortError" });
-    expect(cancelCalled).toBe(true);
+    await expect(loadSourceToBlob(stream, abortController.signal)).rejects.toMatchObject({
+      name: "AbortError",
+    });
   });
 });
