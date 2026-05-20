@@ -1,5 +1,3 @@
 @import "tailwindcss";
 @import "@file-viewer/react/styles.css";
 
-/* Workspace dev: also scan package source for HMR before dist rebuild. */
-@source "../../../packages/file-viewer/src";
