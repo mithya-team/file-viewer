@@ -6,6 +6,7 @@ import { DocxRenderer } from "./renderers/DocxRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
 import { PdfRenderer } from "./renderers/PdfRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
+import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./renderers/rendererViewport";
 import { TextRenderer } from "./renderers/TextRenderer";
 import { loadSourceToBlob } from "./source/loadSourceToBlob";
 import type { DetectionResult, FileViewerChromeApi, FileViewerProps } from "./types";
@@ -295,6 +296,9 @@ export function FileViewer({
           zoom={pdfZoom}
           onError={handleRenderError}
           onPageCountChange={setPdfPageCount}
+          onVisiblePageChange={(visiblePage) =>
+            setPdfPage(setPdfPageWithinBounds(visiblePage, pdfPageCount))
+          }
         />
       )}
       {state.detection.kind === "docx" && <DocxRenderer blob={state.blob} onError={handleRenderError} />}
@@ -303,17 +307,19 @@ export function FileViewer({
 
   return (
     <div
-      className={`flex h-full w-full min-h-0 min-w-0 flex-col rounded border border-(--file-viewer-border,#cbd5e1) bg-(--file-viewer-surface,#ffffff) ${className ?? ""}`}
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded border border-(--file-viewer-border,#cbd5e1) bg-(--file-viewer-surface,#ffffff) ${className ?? ""}`}
     >
       {state.status === "loading" && (
-        <ViewerStatus centered>Loading file...</ViewerStatus>
+        <div className={RENDERER_VIEWPORT_CENTERED_CLASS}>
+          <ViewerStatus centered>Loading file...</ViewerStatus>
+        </div>
       )}
       {(state.status === "error" || state.status === "unsupported") && chromeContent}
       {(state.status === "error" || state.status === "unsupported") && fallback}
       {state.status === "ready" && (
         <>
           {chromeContent}
-          <div className="min-h-0 flex-1">{readyContent}</div>
+          <div className="relative min-h-0 flex-1 overflow-hidden">{readyContent}</div>
         </>
       )}
     </div>

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PdfPageInput } from "./primitives/PdfPageInput";
 import { ViewerButton } from "./primitives/ViewerButton";
 import type { FileViewerChromeApi } from "./types";
 
@@ -27,8 +28,14 @@ export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
         <ViewerButton onClick={api.pdf.prevPage} disabled={!api.pdf.canPrev}>
           Prev
         </ViewerButton>
-        <span className="min-w-20 text-center text-(--file-viewer-foreground,#334155)">
-          Page {api.pdf.page} / {api.pdf.pageCount}
+        <PdfPageInput
+          key={api.pdf.page}
+          page={api.pdf.page}
+          pageCount={api.pdf.pageCount}
+          setPage={api.pdf.setPage}
+        />
+        <span className="text-(--file-viewer-foreground,#334155)">
+          / {api.pdf.pageCount}
         </span>
         <ViewerButton onClick={api.pdf.nextPage} disabled={!api.pdf.canNext}>
           Next
@@ -72,7 +79,7 @@ export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
           <a
             href={api.file.downloadUrl}
             download
-            className="inline-flex items-center justify-center rounded border border-(--file-viewer-border,#cbd5e1) bg-(--file-viewer-surface,#ffffff) px-2 py-1 text-(--file-viewer-foreground,#334155) text-xs"
+            className="inline-flex cursor-pointer items-center justify-center rounded border border-(--file-viewer-border,#cbd5e1) bg-(--file-viewer-surface,#ffffff) px-2 py-1 text-(--file-viewer-foreground,#334155) text-xs"
           >
             Download
           </a>

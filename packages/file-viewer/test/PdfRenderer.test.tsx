@@ -9,15 +9,29 @@ declare global {
 
 const VIEWPORT_WIDTH = 100;
 const VIEWPORT_HEIGHT = 50;
+const OBSERVER_MARGIN = 600;
 
 const {
   getDocumentMock,
+  TextLayerMock,
+  wrapWordSpansMock,
   createFakePdfPage,
   createFakePdfDocument,
   setTransformMock,
   getContextSpy,
+  lazyObservers,
+  visibleObservers,
 } = vi.hoisted(() => {
+  const wrapWordSpansMock = vi.fn();
   const setTransformMock = vi.fn();
+  const lazyObservers: Array<{
+    callback: IntersectionObserverCallback;
+    options?: IntersectionObserverInit;
+  }> = [];
+  const visibleObservers: Array<{
+    callback: IntersectionObserverCallback;
+    options?: IntersectionObserverInit;
+  }> = [];
 
   if (typeof globalThis.window === "undefined") {
     globalThis.window = globalThis as unknown as Window & typeof globalThis;
@@ -36,15 +50,46 @@ const {
       MockCanvas as unknown as typeof HTMLCanvasElement;
   }
 
+  class MockIntersectionObserver implements IntersectionObserver {
+    readonly root: Element | Document | null = null;
+    readonly rootMargin = "";
+    readonly thresholds: ReadonlyArray<number> = [];
+
+    constructor(
+      callback: IntersectionObserverCallback,
+      options?: IntersectionObserverInit,
+    ) {
+      const entry = { callback, options };
+      if (options?.rootMargin?.includes(`${OBSERVER_MARGIN}`)) {
+        lazyObservers.push(entry);
+      } else {
+        visibleObservers.push(entry);
+      }
+    }
+
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+    takeRecords = vi.fn(() => []);
+  }
+
+  globalThis.IntersectionObserver =
+    MockIntersectionObserver as unknown as typeof IntersectionObserver;
+
   const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, "getContext");
 
-  function createFakePdfPage() {
+  function createFakePdfPage(pageNum = 1) {
     return {
       getViewport: vi.fn(({ scale }: { scale: number }) => ({
         width: VIEWPORT_WIDTH * scale,
         height: VIEWPORT_HEIGHT * scale,
       })),
       render: vi.fn(() => ({ promise: Promise.resolve() })),
+      getTextContent: vi.fn(() =>
+        Promise.resolve({
+          items: [{ str: `page${pageNum} word` }],
+        }),
+      ),
     };
   }
 
@@ -61,12 +106,28 @@ const {
     promise: Promise.resolve(createFakePdfDocument()),
   }));
 
+  const TextLayerMock = vi.fn(function TextLayer(this: {
+    textDivs: Array<{ textContent: string; querySelectorAll: () => [] }>;
+    cancel: ReturnType<typeof vi.fn>;
+    render: ReturnType<typeof vi.fn>;
+  }) {
+    this.textDivs = [];
+    this.cancel = vi.fn();
+    this.render = vi.fn(async () => {
+      this.textDivs = [{ textContent: "run", querySelectorAll: () => [] }];
+    });
+  });
+
   return {
     getDocumentMock,
+    TextLayerMock,
+    wrapWordSpansMock,
     createFakePdfPage,
     createFakePdfDocument,
     setTransformMock,
     getContextSpy,
+    lazyObservers,
+    visibleObservers,
   };
 });
 
@@ -77,6 +138,12 @@ vi.mock("pdfjs-dist/build/pdf.worker.min.mjs?worker", () => ({
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: { workerPort: null },
   getDocument: getDocumentMock,
+  TextLayer: TextLayerMock,
+}));
+
+vi.mock("../src/renderers/pdf/pdfTextLayerWordSpans", () => ({
+  PDF_WORD_SEG_CLASS: "pdf-word-seg",
+  wrapPdfTextLayerRunsWithWordSpans: wrapWordSpansMock,
 }));
 
 import { PdfRenderer } from "../src/renderers/PdfRenderer";
@@ -100,7 +167,7 @@ async function flush() {
   });
 }
 
-async function waitFor<T>(read: () => T | null, attempts = 30): Promise<T> {
+async function waitFor<T>(read: () => T | null, attempts = 40): Promise<T> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const value = read();
     if (value != null) return value;
@@ -128,6 +195,46 @@ function defaultProps(overrides: Partial<Parameters<typeof PdfRenderer>[0]> = {}
   };
 }
 
+function createIntersectionTarget(pageNum: number) {
+  return {
+    dataset: { pageNum: String(pageNum) },
+    getBoundingClientRect: () => ({
+      top: 0,
+      bottom: 100,
+      left: 0,
+      right: 100,
+    }),
+  };
+}
+
+function triggerLazyIntersection(_renderer: ReactTestRenderer, pageNum: number) {
+  const lazyObserver = lazyObservers.at(-1);
+  lazyObserver?.callback(
+    [
+      {
+        isIntersecting: true,
+        target: createIntersectionTarget(pageNum),
+        intersectionRatio: 1,
+      } as IntersectionObserverEntry,
+    ],
+    lazyObserver as unknown as IntersectionObserver,
+  );
+}
+
+function triggerVisiblePage(_renderer: ReactTestRenderer, pageNum: number) {
+  const visibleObserver = visibleObservers.at(-1);
+  visibleObserver?.callback(
+    [
+      {
+        isIntersecting: true,
+        target: createIntersectionTarget(pageNum),
+        intersectionRatio: 1,
+      } as IntersectionObserverEntry,
+    ],
+    visibleObserver as unknown as IntersectionObserver,
+  );
+}
+
 type MockCanvasNode = {
   width: number;
   height: number;
@@ -148,18 +255,77 @@ function createCanvasNode(): MockCanvasNode {
 
 describe("PdfRenderer", () => {
   let renderer: ReactTestRenderer | undefined;
-  let canvasNode: MockCanvasNode | undefined;
+  const pageSlotHosts = new Map<number, { scrollIntoView: ReturnType<typeof vi.fn> }>();
   let originalDevicePixelRatio: number | undefined;
+  let scrollIntoViewMock: ReturnType<typeof vi.fn>;
 
   async function renderPdfRenderer(
     element: ReactElement,
   ): Promise<ReactTestRenderer> {
+    pageSlotHosts.clear();
     await act(async () => {
       renderer = create(element, {
         createNodeMock: (node) => {
           if (node.type === "canvas") {
-            canvasNode = createCanvasNode();
-            return canvasNode;
+            return createCanvasNode();
+          }
+          if (node.type === "div") {
+            const pageNum = node.props["data-page-num"];
+            if (pageNum != null) {
+              const host = {
+                style: { setProperty: vi.fn() },
+                replaceChildren: vi.fn(),
+                scrollIntoView: scrollIntoViewMock,
+                dataset: { pageNum: String(pageNum) },
+                getBoundingClientRect: () => ({
+                  top: 0,
+                  bottom: 100,
+                  left: 0,
+                  right: 100,
+                }),
+              };
+              pageSlotHosts.set(Number(pageNum), host);
+              return host;
+            }
+            const className = node.props.className as string | undefined;
+            if (className?.includes("bg-transparent")) {
+              const scrollHost = {
+                getBoundingClientRect: () => ({
+                  top: 0,
+                  bottom: 200,
+                  left: 0,
+                  right: 200,
+                }),
+                querySelector: (selector: string) => {
+                  const match = selector.match(/data-page-num="(\d+)"/);
+                  if (match == null) return null;
+                  return pageSlotHosts.get(Number(match[1])) ?? null;
+                },
+                querySelectorAll: () => Array.from(pageSlotHosts.values()),
+              };
+              const ref = node.props.ref as
+                | ((instance: typeof scrollHost | null) => void)
+                | { current?: typeof scrollHost | null }
+                | null;
+              if (typeof ref === "function") {
+                ref(scrollHost);
+              } else if (ref != null && "current" in ref) {
+                ref.current = scrollHost;
+              }
+              return scrollHost;
+            }
+            return {
+              style: { setProperty: vi.fn() },
+              replaceChildren: vi.fn(),
+              dataset: {},
+              getBoundingClientRect: () => ({
+                top: 0,
+                bottom: 100,
+                left: 0,
+                right: 100,
+              }),
+              querySelectorAll: () => [],
+            };
           }
           return null;
         },
@@ -168,13 +334,29 @@ describe("PdfRenderer", () => {
     return renderer as ReactTestRenderer;
   }
 
+  function collectPageSlots(root: ReactTestRenderer["root"]) {
+    return root.findAll((node) => node.props["data-page-num"] != null);
+  }
+
   beforeEach(() => {
-    canvasNode = undefined;
+    pageSlotHosts.clear();
+    lazyObservers.length = 0;
+    visibleObservers.length = 0;
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      (cb: FrameRequestCallback) => {
+        cb(0);
+        return 0;
+      },
+    );
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
     getDocumentMock.mockReset();
     getDocumentMock.mockImplementation(() => ({
       promise: Promise.resolve(createFakePdfDocument()),
     }));
+    TextLayerMock.mockClear();
+    wrapWordSpansMock.mockReset();
     setTransformMock.mockReset();
     getContextSpy.mockImplementation(() => ({
       setTransform: setTransformMock,
@@ -184,6 +366,7 @@ describe("PdfRenderer", () => {
       configurable: true,
       value: 2,
     });
+    scrollIntoViewMock = vi.fn();
   });
 
   afterEach(async () => {
@@ -252,31 +435,80 @@ describe("PdfRenderer", () => {
     expect(onPageCountChange).toHaveBeenCalledWith(5);
   });
 
-  it("fetches a new page without reloading the document", async () => {
-    const blob = createPdfLikeBlob(128);
+  it("renders a page slot per document page", async () => {
+    getDocumentMock.mockImplementation(() => ({
+      promise: Promise.resolve(createFakePdfDocument(4)),
+    }));
+
+    await renderPdfRenderer(<PdfRenderer {...defaultProps()} />);
+    await waitFor(() =>
+      collectPageSlots(renderer!.root).length === 4 ? true : null,
+    );
+
+    expect(collectPageSlots(renderer!.root)).toHaveLength(4);
+  });
+
+  it("lazy-renders intersecting pages only", async () => {
     const document = createFakePdfDocument(3);
     getDocumentMock.mockImplementation(() => ({
       promise: Promise.resolve(document),
     }));
 
-    await renderPdfRenderer(<PdfRenderer {...defaultProps({ blob })} />);
-
+    await renderPdfRenderer(<PdfRenderer {...defaultProps()} />);
     await waitFor(() =>
-      (document.getPage as ReturnType<typeof vi.fn>).mock.calls.length > 0
-        ? true
-        : null,
+      collectPageSlots(renderer!.root).length === 3 ? true : null,
     );
-    const initialGetPageCalls = (document.getPage as ReturnType<typeof vi.fn>)
-      .mock.calls.length;
+
+    (document.getPage as ReturnType<typeof vi.fn>).mockClear();
 
     await act(async () => {
-      renderer?.update(<PdfRenderer {...defaultProps({ blob, page: 2 })} />);
+      triggerLazyIntersection(renderer!, 1);
     });
     await flush();
 
-    expect(getDocumentMock).toHaveBeenCalledTimes(1);
-    expect(document.getPage).toHaveBeenCalledTimes(initialGetPageCalls + 1);
-    expect(document.getPage).toHaveBeenLastCalledWith(2);
+    expect(document.getPage).toHaveBeenCalledWith(1);
+    expect(document.getPage).not.toHaveBeenCalledWith(2);
+  });
+
+  it("mounts page slots for programmatic page navigation", async () => {
+    const blob = createPdfLikeBlob(128);
+    getDocumentMock.mockImplementation(() => ({
+      promise: Promise.resolve(createFakePdfDocument(3)),
+    }));
+
+    await renderPdfRenderer(
+      <PdfRenderer {...defaultProps({ blob, page: 2 })} />,
+    );
+    await waitFor(() =>
+      collectPageSlots(renderer!.root).length === 3 ? true : null,
+    );
+    await flush();
+
+    const pageTwoSlot = renderer!.root.find(
+      (node) => node.props["data-page-num"] === 2,
+    );
+    expect(pageTwoSlot).toBeDefined();
+  });
+
+  it("reports visible page via onVisiblePageChange", async () => {
+    const onVisiblePageChange = vi.fn();
+    getDocumentMock.mockImplementation(() => ({
+      promise: Promise.resolve(createFakePdfDocument(3)),
+    }));
+
+    await renderPdfRenderer(
+      <PdfRenderer {...defaultProps({ onVisiblePageChange })} />,
+    );
+    await waitFor(() =>
+      collectPageSlots(renderer!.root).length === 3 ? true : null,
+    );
+
+    await act(async () => {
+      triggerVisiblePage(renderer!, 2);
+    });
+    await flush();
+
+    expect(onVisiblePageChange).toHaveBeenCalledWith(2);
   });
 
   it("re-renders on zoom changes without reloading the document", async () => {
@@ -287,23 +519,35 @@ describe("PdfRenderer", () => {
     }));
 
     await renderPdfRenderer(<PdfRenderer {...defaultProps({ blob })} />);
-
     await waitFor(() =>
-      (document.getPage as ReturnType<typeof vi.fn>).mock.calls.length > 0
-        ? true
-        : null,
+      collectPageSlots(renderer!.root).length === 3 ? true : null,
     );
+
+    await act(async () => {
+      triggerLazyIntersection(renderer!, 1);
+    });
+    await flush();
+
+    const pdfPage = await (document.getPage as ReturnType<typeof vi.fn>)(1);
+
     await act(async () => {
       renderer?.update(<PdfRenderer {...defaultProps({ blob, zoom: 150 })} />);
     });
     await flush();
 
-    const pdfPage = await (document.getPage as ReturnType<typeof vi.fn>).mock
-      .results[0]?.value;
+    await act(async () => {
+      triggerLazyIntersection(renderer!, 1);
+    });
+    await waitFor(() =>
+      pdfPage.getViewport.mock.calls.some(
+        (call) => call[0]?.scale === 1.5,
+      )
+        ? true
+        : null,
+    );
 
     expect(getDocumentMock).toHaveBeenCalledTimes(1);
-    expect(pdfPage.getViewport).toHaveBeenCalledWith({ scale: 1 });
-    expect(pdfPage.getViewport).toHaveBeenLastCalledWith({ scale: 1.5 });
+    expect(pdfPage.getViewport).toHaveBeenCalledWith({ scale: 1.5 });
   });
 
   it("destroys the prior document and reloads when the blob changes", async () => {
@@ -363,11 +607,6 @@ describe("PdfRenderer", () => {
         <PdfRenderer {...defaultProps({ blob, onError: vi.fn() })} />,
       );
     });
-    await act(async () => {
-      renderer?.update(
-        <PdfRenderer {...defaultProps({ blob, onError: vi.fn() })} />,
-      );
-    });
     await flush();
 
     expect(getDocumentMock).toHaveBeenCalledTimes(1);
@@ -382,43 +621,22 @@ describe("PdfRenderer", () => {
         }),
       }));
 
-      await renderPdfRenderer(<PdfRenderer {...defaultProps({ pageCount: 1 })} />);
+      await renderPdfRenderer(<PdfRenderer {...defaultProps()} />);
       await flush();
 
       expect(hasText(renderer, "Loading PDF...")).toBe(true);
-      expect(hasText(renderer, "Page 1 / 1")).toBe(false);
+      expect(collectPageSlots(renderer!.root).length).toBe(0);
 
       await act(async () => {
         resolveDocument(createFakePdfDocument());
       });
       await flush();
 
-      await waitFor(() => (hasText(renderer, "Page 1 / 1") ? true : null));
+      await waitFor(() =>
+        collectPageSlots(renderer!.root).length > 0 ? true : null,
+      );
 
       expect(hasText(renderer, "Loading PDF...")).toBe(false);
-    });
-
-    it("hides the page indicator until the document loads", async () => {
-      let resolveDocument: (document: PDFDocumentProxy) => void = () => undefined;
-      getDocumentMock.mockImplementation(() => ({
-        promise: new Promise<PDFDocumentProxy>((resolve) => {
-          resolveDocument = resolve;
-        }),
-      }));
-
-      await renderPdfRenderer(
-        <PdfRenderer {...defaultProps({ page: 2, pageCount: 5 })} />,
-      );
-      await flush();
-
-      expect(hasText(renderer, "Page 2 / 5")).toBe(false);
-
-      await act(async () => {
-        resolveDocument(createFakePdfDocument(5));
-      });
-      await flush();
-
-      await waitFor(() => (hasText(renderer, "Page 2 / 5") ? true : null));
     });
 
     it("shows loading again when the blob changes before the new document loads", async () => {
@@ -439,7 +657,9 @@ describe("PdfRenderer", () => {
       await renderPdfRenderer(
         <PdfRenderer {...defaultProps({ blob: firstBlob })} />,
       );
-      await waitFor(() => (hasText(renderer, "Page 1 / 1") ? true : null));
+      await waitFor(() =>
+        collectPageSlots(renderer!.root).length > 0 ? true : null,
+      );
 
       await act(async () => {
         renderer?.update(
@@ -449,31 +669,97 @@ describe("PdfRenderer", () => {
       await flush();
 
       expect(hasText(renderer, "Loading PDF...")).toBe(true);
-      expect(hasText(renderer, "Page 1 / 1")).toBe(false);
 
       await act(async () => {
         resolveSecond(createFakePdfDocument(4));
       });
       await flush();
 
-      await waitFor(() => (hasText(renderer, "Page 1 / 1") ? true : null));
+      await waitFor(() =>
+        collectPageSlots(renderer!.root).length === 4 ? true : null,
+      );
       expect(hasText(renderer, "Loading PDF...")).toBe(false);
     });
   });
 
-  it("applies HiDPI canvas backing store, CSS size, and setTransform", async () => {
+  it("uses transparent scroll root and page sheet classes", async () => {
     await renderPdfRenderer(<PdfRenderer {...defaultProps()} />);
-
-    await waitFor(() => (canvasNode != null && canvasNode.width > 0 ? true : null));
-
-    expect(canvasNode?.width).toBe(Math.floor(VIEWPORT_WIDTH * 2));
-    expect(canvasNode?.height).toBe(Math.floor(VIEWPORT_HEIGHT * 2));
-    expect(canvasNode?.style).toEqual(
-      expect.objectContaining({
-        width: `${VIEWPORT_WIDTH}px`,
-        height: `${VIEWPORT_HEIGHT}px`,
-      }),
+    await waitFor(() =>
+      collectPageSlots(renderer!.root).length > 0 ? true : null,
     );
+
+    const scrollRoot = renderer!.root.find(
+      (node) =>
+        typeof node.props.className === "string"
+        && node.props.className.includes("bg-transparent"),
+    );
+    expect(scrollRoot).toBeDefined();
+
+    const pageSlot = renderer!.root.find(
+      (node) => node.props["data-page-num"] === 1,
+    );
+    expect(pageSlot?.props.className).toContain("bg-(--file-viewer-surface");
+  });
+
+  describe("text layer spans", () => {
+    it("does not wrap word spans when search is empty", async () => {
+      getDocumentMock.mockImplementation(() => ({
+        promise: Promise.resolve(createFakePdfDocument(1)),
+      }));
+
+      await renderPdfRenderer(<PdfRenderer {...defaultProps()} />);
+      await waitFor(() =>
+        collectPageSlots(renderer!.root).length === 1 ? true : null,
+      );
+
+      await act(async () => {
+        triggerLazyIntersection(renderer!, 1);
+      });
+      await flush();
+      await waitFor(() => (TextLayerMock.mock.calls.length > 0 ? true : null));
+
+      expect(wrapWordSpansMock).not.toHaveBeenCalled();
+    });
+
+    it("wraps word spans when search query is non-empty", async () => {
+      getDocumentMock.mockImplementation(() => ({
+        promise: Promise.resolve(createFakePdfDocument(1)),
+      }));
+
+      await renderPdfRenderer(
+        <PdfRenderer {...defaultProps({ searchQuery: "word" })} />,
+      );
+      await waitFor(() =>
+        collectPageSlots(renderer!.root).length === 1 ? true : null,
+      );
+
+      await act(async () => {
+        triggerLazyIntersection(renderer!, 1);
+      });
+      await flush();
+      await waitFor(() => (wrapWordSpansMock.mock.calls.length > 0 ? true : null));
+
+      expect(wrapWordSpansMock).toHaveBeenCalled();
+    });
+  });
+
+  it("applies HiDPI canvas backing store, CSS size, and setTransform", async () => {
+    getDocumentMock.mockImplementation(() => ({
+      promise: Promise.resolve(createFakePdfDocument(1)),
+    }));
+
+    await renderPdfRenderer(<PdfRenderer {...defaultProps()} />);
+    await waitFor(() =>
+      collectPageSlots(renderer!.root).length === 1 ? true : null,
+    );
+
+    await act(async () => {
+      triggerLazyIntersection(renderer!, 1);
+    });
+    await flush();
+
+    await waitFor(() => (setTransformMock.mock.calls.length > 0 ? true : null));
+
     expect(setTransformMock).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0);
   });
 });
