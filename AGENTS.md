@@ -31,7 +31,7 @@ A React-based file-viewer library that provides a single `FileViewer` component 
 
 **Extracted from `docs/invariants.md` - MUST ADHERE TO THESE:**
 
-1. **Public API:** Only expose `FileViewer` and public types. Renderers must remain internal.
+1. **Public API:** Only expose `FileViewer` and documented public types from the package entry. Renderer components must remain internal; renderer prop types may be exported for TypeScript consumers.
 2. **Source Prop:** Accept exactly one `source` prop: `string | Blob | ReadableStream<Uint8Array>`.
 3. **Renderer Selection:** MUST be content-driven (magic bytes first, loaded MIME/header data second). NEVER use filename extensions, consumer-provided MIME types, or text/csv content heuristics for routing.
 4. **Data Handling:** All sources must be buffered to a `Blob` before rendering (no progressive rendering in v1).

@@ -3,7 +3,7 @@ import { renderAsync } from "docx-preview";
 import { ViewerStatus } from "../primitives/ViewerStatus";
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
-interface DocxRendererProps {
+export interface DocxRendererProps {
   blob: Blob;
   onError: (error: Error) => void;
 }

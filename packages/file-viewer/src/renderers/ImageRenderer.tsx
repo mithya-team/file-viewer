@@ -1,6 +1,6 @@
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
-interface ImageRendererProps {
+export interface ImageRendererProps {
   objectUrl: string;
   onError: (error: Error) => void;
 }

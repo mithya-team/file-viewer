@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ViewerStatus } from "../primitives/ViewerStatus";
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
-interface TextRendererProps {
+export interface TextRendererProps {
   blob: Blob;
   onError: (error: Error) => void;
 }

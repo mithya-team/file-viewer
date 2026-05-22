@@ -26,3 +26,38 @@ if (!bundleSource.includes(`assets/${workerAssetName}`)) {
 if (bundleSource.includes("packages/file-viewer/src")) {
   throw new Error("Workspace-only source path leaked into the built package artifact.");
 }
+
+const declarationSource = await readFile(join(distDir, "index.d.ts"), "utf8");
+
+const requiredPublicTypes = [
+  "FileViewerSource",
+  "FileViewerProps",
+  "FileViewerChrome",
+  "FileViewerChromeApi",
+  "FileViewerErrorContext",
+  "FileKind",
+  "DetectionResult",
+  "ImageChromeApi",
+  "PDFChromeApi",
+  "SpreadsheetChromeApi",
+  "DocxChromeApi",
+  "TextChromeApi",
+  "UnsupportedChromeApi",
+  "StringSourceKind",
+  "PdfRendererProps",
+  "ImageRendererProps",
+  "SpreadsheetRendererProps",
+  "DocxRendererProps",
+  "TextRendererProps",
+  "PdfSearchMatch",
+  "PdfSearchState",
+];
+
+const missingTypes = requiredPublicTypes.filter(
+  (typeName) => !declarationSource.includes(typeName),
+);
+if (missingTypes.length > 0) {
+  throw new Error(
+    `dist/index.d.ts is missing public type exports: ${missingTypes.join(", ")}`,
+  );
+}

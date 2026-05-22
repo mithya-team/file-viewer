@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { ViewerStatus } from "../primitives/ViewerStatus";
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
-interface SpreadsheetRendererProps {
+export interface SpreadsheetRendererProps {
   blob: Blob;
   activeSheetIndex: number;
   onError: (error: Error) => void;

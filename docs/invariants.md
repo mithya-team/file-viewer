@@ -9,7 +9,7 @@ This file details what not to do when building this library/package.
 - Must not add parallel source props like `url`, `blob`, `base64`, `streamUrl`, or `mimeTypeForRenderer`.
 - Must not require consumers to choose a renderer.
 - Must allow consumers to hide built-in viewer chrome or replace it with consumer-owned chrome.
-- Must not export individual renderers as public API in v1.
+- Must not export individual renderer components as public API in v1; TypeScript types for chrome, detection, source classification, renderer props, and PDF search may be exported from the package entry.
 - Must not add custom renderer registration in v1.
 
 ## Source Loading

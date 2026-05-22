@@ -270,6 +270,22 @@ Example:
 
 Then pass a wrapper class or `className` as usual.
 
+## TypeScript exports
+
+Import types from `@file-viewer/react` (type-only imports recommended). Renderer **components** are not exported; only `FileViewer` is the public runtime API.
+
+**Core:** `FileViewerSource`, `FileViewerProps`, `FileViewerChrome`, `FileViewerChromeApi`, `FileViewerErrorContext`
+
+**Detection:** `FileKind`, `DetectionResult`
+
+**Chrome (per format):** `ImageChromeApi`, `PDFChromeApi`, `SpreadsheetChromeApi`, `DocxChromeApi`, `TextChromeApi`, `UnsupportedChromeApi`
+
+**Source classification:** `StringSourceKind`
+
+**Renderer props (types only):** `PdfRendererProps`, `ImageRendererProps`, `SpreadsheetRendererProps`, `DocxRendererProps`, `TextRendererProps`
+
+**PDF search:** `PdfSearchMatch`, `PdfSearchState`
+
 ## Runtime Notes
 
 - import is SSR-safe, but rendering is client/browser behavior
