@@ -8,6 +8,8 @@ export type DemoControls = {
   mode: SourceMode;
   scenario: DemoScenario;
   chromeMode: ChromeMode;
+  /** 1-based PDF page to open when the document loads (`?page=`). */
+  initialPage?: number;
 };
 
 const FILE_TYPES: readonly DemoFileType[] = [
@@ -34,6 +36,14 @@ function isOneOf<T extends string>(value: string, allowed: readonly T[]): value 
   return (allowed as readonly string[]).includes(value);
 }
 
+function parseInitialPage(search: URLSearchParams): number | undefined {
+  const page = search.get("page");
+  if (page == null) return undefined;
+  const parsed = Number.parseInt(page, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return undefined;
+  return parsed;
+}
+
 export function parseDemoControls(search: URLSearchParams): DemoControls {
   const fileType = search.get("file");
   const mode = search.get("mode");
@@ -55,6 +65,7 @@ export function parseDemoControls(search: URLSearchParams): DemoControls {
       chromeMode != null && isOneOf(chromeMode, CHROME_MODES)
         ? chromeMode
         : DEFAULT_CONTROLS.chromeMode,
+    initialPage: parseInitialPage(search),
   };
 }
 
@@ -68,6 +79,9 @@ export function replaceDemoControlsInLocation(controls: DemoControls): void {
   search.set("mode", controls.mode);
   search.set("scenario", controls.scenario);
   search.set("chrome", controls.chromeMode);
+  if (controls.initialPage != null) {
+    search.set("page", String(controls.initialPage));
+  }
   const next = `${window.location.pathname}?${search.toString()}`;
   window.history.replaceState(window.history.state, "", next);
 }

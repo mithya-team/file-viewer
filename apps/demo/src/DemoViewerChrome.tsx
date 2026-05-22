@@ -1,13 +1,15 @@
-import type { FileViewerChromeApi } from "@file-viewer/react";
+import type { FileViewerChromeApi, PDFChromeApi } from "@file-viewer/react";
+import { DemoPdfPageInput } from "./DemoPdfPageInput";
 
 interface DemoViewerChromeProps {
   api: FileViewerChromeApi;
+  initialPage?: number;
 }
 
 type DemoPdfChromeApi = Extract<FileViewerChromeApi, { file: { kind: "pdf" } }>;
 type DemoSpreadsheetChromeApi = Extract<FileViewerChromeApi, { file: { kind: "spreadsheet" } }>;
 
-export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
+export function DemoViewerChrome({ api, initialPage }: DemoViewerChromeProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-t-lg border-b border-slate-300 bg-slate-900 px-3 py-2 text-xs text-slate-100">
       <span className="font-semibold uppercase tracking-wide">
@@ -26,9 +28,15 @@ export function DemoViewerChrome({ api }: DemoViewerChromeProps) {
           >
             Prev
           </button>
-          <span>
-            {api.pdf.page} / {api.pdf.pageCount}
-          </span>
+          <DemoPdfPageInput
+            key={api.file.downloadUrl ?? "pdf"}
+            documentKey={api.file.downloadUrl ?? undefined}
+            initialPage={initialPage}
+            page={api.pdf.page}
+            pageCount={api.pdf.pageCount}
+            setPage={api.pdf.setPage}
+          />
+          <span>/ {api.pdf.pageCount}</span>
           <button
             type="button"
             onClick={api.pdf.nextPage}

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileViewer, type FileViewerSource } from "@file-viewer/react";
+import {
+  FileViewer,
+  type FileViewerChromeApi,
+  type FileViewerSource,
+} from "@file-viewer/react";
 import { DemoViewerChrome } from "./DemoViewerChrome";
 import {
   readDemoControlsFromLocation,
@@ -135,7 +139,7 @@ async function buildSource(
 
 export default function App() {
   const [controls, setControls] = useState<DemoControls>(readDemoControlsFromLocation);
-  const { fileType, mode, scenario, chromeMode } = controls;
+  const { fileType, mode, scenario, chromeMode, initialPage } = controls;
   const [source, setSource] = useState<FileViewerSource | null>(null);
   const [status, setStatus] = useState<string>("Preparing source...");
   const [error, setError] = useState<string | null>(null);
@@ -225,6 +229,14 @@ export default function App() {
     [applyControls, controls, scenario],
   );
 
+  const customChrome = useMemo(
+    () =>
+      function CustomDemoChrome({ api }: { api: FileViewerChromeApi }) {
+        return <DemoViewerChrome api={api} initialPage={initialPage} />;
+      },
+    [initialPage],
+  );
+
   const chromeButtons = useMemo(
     () =>
       (["default", "none", "custom"] as ChromeMode[]).map((nextChromeMode) => (
@@ -253,7 +265,8 @@ export default function App() {
               FileViewer demo
             </strong>
             <span>
-              File: {FILE_LABELS[fileType]} | Source: {mode.toUpperCase()} | Scenario: {SCENARIO_LABELS[scenario]} | Chrome: {chromeMode.toUpperCase()} | {status}
+              File: {FILE_LABELS[fileType]} | Source: {mode.toUpperCase()} | Scenario: {SCENARIO_LABELS[scenario]} | Chrome: {chromeMode.toUpperCase()}
+              {initialPage != null ? ` | Page: ${initialPage}` : ""} | {status}
             </span>
           </div>
           {viewerEvent != null && (
@@ -270,7 +283,7 @@ export default function App() {
               <FileViewer
                 className="absolute inset-0 min-h-0"
                 source={resolvedSource}
-                chrome={chromeMode === "custom" ? DemoViewerChrome : chromeMode}
+                chrome={chromeMode === "custom" ? customChrome : chromeMode}
                 onError={(nextError, context) => {
                   setViewerEvent(`${context.stage}: ${nextError.message}`);
                 }}
