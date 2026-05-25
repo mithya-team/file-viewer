@@ -29,8 +29,8 @@ const FILE_PATHS: Record<DemoFileType, string> = {
   text: "/sample-files/2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding%20Agreement_%20Agency%20Agreement.txt",
   csv: "/sample-files/blank%20rfp%20-shortened.csv",
   image: "/sample-files/mountains.jpg",
-  pdf: "/sample-files/CreditcardscomInc_20070810_S-1_EX-10.33_362297_EX-10.33_Affiliate%20Agreement.pdf",
-  docx: "/sample-files/file-sample_100kB.docx",
+  pdf: "/sample-files/Sample-Penetration-Test-Report-PurpleSec.pdf",
+  docx: "/sample-files/dataops_sample_template_v1.docx",
   dotx: "/sample-files/example.dotx",
   xlsx: "/sample-files/Label%20Report%20-%20Anti-assignment,%20CIC%20(Group%203).xlsx",
 };
