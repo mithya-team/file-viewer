@@ -187,6 +187,16 @@ function MyChrome({ api }: { api: FileViewerChromeApi }) {
     );
   }
 
+  if (api.file.kind === "image") {
+    return (
+      <div>
+        <button type="button" onClick={api.image.zoomOut}>-</button>
+        <span>{api.image.zoom}%</span>
+        <button type="button" onClick={api.image.zoomIn}>+</button>
+      </div>
+    );
+  }
+
   if (api.file.kind === "spreadsheet") {
     if (api.file.mimeType === "text/csv") {
       return <div>CSV has no workbook controls.</div>;
@@ -218,6 +228,8 @@ Notes:
 - CSV uses `api.file.kind === "spreadsheet"` but has no workbook-level controls
 - custom spreadsheet chrome should branch on `api.file.mimeType`
 - built-in chrome is hidden for unsupported files, but custom chrome can still receive `api.file.kind === "unsupported"`
+- images expose `api.image.zoom`, toolbar `zoomIn` / `zoomOut` (±10%, clamped 40–200%), `setZoom`, `stepZoomIn` (sequential click steps), and `resetZoom` (100%)
+- with `chrome="none"`, single-click step zoom and double-click reset still work on the image viewport
 
 ## Fallbacks And Errors
 

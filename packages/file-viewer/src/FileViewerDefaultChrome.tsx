@@ -11,6 +11,10 @@ function isPdfChromeApi(api: FileViewerChromeApi): api is Extract<FileViewerChro
   return api.file.kind === "pdf";
 }
 
+function isImageChromeApi(api: FileViewerChromeApi): api is Extract<FileViewerChromeApi, { file: { kind: "image" } }> {
+  return api.file.kind === "image";
+}
+
 function isSpreadsheetChromeApi(
   api: FileViewerChromeApi,
 ): api is Extract<FileViewerChromeApi, { file: { kind: "spreadsheet" } }> {
@@ -47,6 +51,14 @@ export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
         <ViewerButton onClick={api.pdf.zoomIn}>
           +
         </ViewerButton>
+      </div>
+    );
+  } else if (isImageChromeApi(api)) {
+    controls = (
+      <div className="flex items-center gap-2">
+        <ViewerButton onClick={api.image.zoomOut}>-</ViewerButton>
+        <span className="text-(--file-viewer-foreground,#334155)">{api.image.zoom}%</span>
+        <ViewerButton onClick={api.image.zoomIn}>+</ViewerButton>
       </div>
     );
   } else if (isSpreadsheetChromeApi(api)) {

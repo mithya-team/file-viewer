@@ -8,6 +8,12 @@ import { PdfRenderer } from "./renderers/PdfRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./renderers/rendererViewport";
 import { TextRenderer } from "./renderers/TextRenderer";
+import {
+  clampImageZoom,
+  DEFAULT_IMAGE_ZOOM,
+  IMAGE_ZOOM_TOOLBAR_STEP,
+  zoomAfterImageClick,
+} from "./image/imageZoom";
 import { loadSourceToBlob } from "./source/loadSourceToBlob";
 import type { DetectionResult, FileViewerChromeApi, FileViewerProps } from "./types";
 
@@ -42,22 +48,26 @@ function createChromeApi({
   pdfPage,
   pdfPageCount,
   pdfZoom,
+  imageZoom,
   sheetNames,
   activeSheetIndex,
   setActiveSheetIndex,
   setPdfPage,
   setPdfZoom,
+  setImageZoom,
 }: {
   detection: DetectionResult;
   downloadUrl: string | null;
   pdfPage: number;
   pdfPageCount: number;
   pdfZoom: number;
+  imageZoom: number;
   sheetNames: string[];
   activeSheetIndex: number;
   setActiveSheetIndex: (index: number) => void;
   setPdfPage: (page: number) => void;
   setPdfZoom: (zoom: number) => void;
+  setImageZoom: (zoom: number) => void;
 }): FileViewerChromeApi {
   switch (detection.kind) {
     case "image":
@@ -66,6 +76,14 @@ function createChromeApi({
           kind: "image",
           mimeType: detection.mimeType,
           downloadUrl,
+        },
+        image: {
+          zoom: imageZoom,
+          zoomIn: () => setImageZoom(clampImageZoom(imageZoom + IMAGE_ZOOM_TOOLBAR_STEP)),
+          zoomOut: () => setImageZoom(clampImageZoom(imageZoom - IMAGE_ZOOM_TOOLBAR_STEP)),
+          setZoom: (zoom) => setImageZoom(clampImageZoom(zoom)),
+          stepZoomIn: () => setImageZoom(zoomAfterImageClick(imageZoom)),
+          resetZoom: () => setImageZoom(DEFAULT_IMAGE_ZOOM),
         },
       };
     case "pdf":
@@ -148,6 +166,7 @@ export function FileViewer({
   const [pdfPage, setPdfPage] = useState(1);
   const [pdfPageCount, setPdfPageCount] = useState(1);
   const [pdfZoom, setPdfZoom] = useState(100);
+  const [imageZoom, setImageZoom] = useState(DEFAULT_IMAGE_ZOOM);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const onErrorRef = useRef(onError);
@@ -184,6 +203,7 @@ export function FileViewer({
     setPdfPage(1);
     setPdfPageCount(1);
     setPdfZoom(100);
+    setImageZoom(DEFAULT_IMAGE_ZOOM);
     setSheetNames([]);
     setActiveSheetIndex(0);
   }, [source]);
@@ -194,7 +214,7 @@ export function FileViewer({
 
   useEffect(() => {
     setRenderError(null);
-  }, [pdfPage, pdfZoom, activeSheetIndex]);
+  }, [pdfPage, pdfZoom, imageZoom, activeSheetIndex]);
 
   useEffect(() => {
     if (state.status !== "ready") {
@@ -256,13 +276,15 @@ export function FileViewer({
       pdfPage,
       pdfPageCount,
       pdfZoom,
+      imageZoom,
       sheetNames,
       activeSheetIndex,
       setActiveSheetIndex,
       setPdfPage: (page) => setPdfPage(setPdfPageWithinBounds(page, pdfPageCount)),
       setPdfZoom: (zoom) => setPdfZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
+      setImageZoom: (zoom) => setImageZoom(clampImageZoom(zoom)),
     });
-  }, [activeSheetIndex, objectUrl, pdfPage, pdfPageCount, pdfZoom, sheetNames, state]);
+  }, [activeSheetIndex, objectUrl, pdfPage, pdfPageCount, pdfZoom, imageZoom, sheetNames, state]);
 
   const chromeContent = useMemo(() => {
     if (chromeApi == null || chrome === "none") return null;
@@ -278,7 +300,13 @@ export function FileViewer({
     <>
       {state.detection.kind === "text" && <TextRenderer blob={state.blob} onError={handleRenderError} />}
       {state.detection.kind === "image" && objectUrl != null && (
-        <ImageRenderer objectUrl={objectUrl} onError={handleRenderError} />
+        <ImageRenderer
+          objectUrl={objectUrl}
+          zoom={imageZoom}
+          onError={handleRenderError}
+          onStepZoom={() => setImageZoom(zoomAfterImageClick(imageZoom))}
+          onResetZoom={() => setImageZoom(DEFAULT_IMAGE_ZOOM)}
+        />
       )}
       {state.detection.kind === "spreadsheet" && (
         <SpreadsheetRenderer

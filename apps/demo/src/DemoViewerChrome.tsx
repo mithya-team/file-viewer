@@ -7,6 +7,7 @@ interface DemoViewerChromeProps {
 }
 
 type DemoPdfChromeApi = Extract<FileViewerChromeApi, { file: { kind: "pdf" } }>;
+type DemoImageChromeApi = Extract<FileViewerChromeApi, { file: { kind: "image" } }>;
 type DemoSpreadsheetChromeApi = Extract<FileViewerChromeApi, { file: { kind: "spreadsheet" } }>;
 
 export function DemoViewerChrome({ api, initialPage }: DemoViewerChromeProps) {
@@ -62,6 +63,25 @@ export function DemoViewerChrome({ api, initialPage }: DemoViewerChromeProps) {
           </button>
         </div>
       )}
+      {isImageChromeApi(api) && (
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={api.image.zoomOut}
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
+          >
+            -
+          </button>
+          <span>{api.image.zoom}%</span>
+          <button
+            type="button"
+            onClick={api.image.zoomIn}
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
+          >
+            +
+          </button>
+        </div>
+      )}
       {isSpreadSheetChromeApi(api) && (
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {api.file.mimeType === "text/csv" ? (
@@ -99,6 +119,10 @@ export function DemoViewerChrome({ api, initialPage }: DemoViewerChromeProps) {
 
 const isPDFChromeApi = (api: FileViewerChromeApi): api is DemoPdfChromeApi => {
   return api.file.kind === "pdf";
+};
+
+const isImageChromeApi = (api: FileViewerChromeApi): api is DemoImageChromeApi => {
+  return api.file.kind === "image";
 };
 
 const isSpreadSheetChromeApi = (

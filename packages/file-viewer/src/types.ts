@@ -29,6 +29,14 @@ type ChromeFileBase<K extends FileKind> = {
 };
 export type ImageChromeApi = {
   file: ChromeFileBase<"image">;
+  image: {
+    zoom: number;
+    zoomIn: () => void;
+    zoomOut: () => void;
+    setZoom: (zoom: number) => void;
+    stepZoomIn: () => void;
+    resetZoom: () => void;
+  };
 };
 export type PDFChromeApi = {
   file: ChromeFileBase<"pdf">;

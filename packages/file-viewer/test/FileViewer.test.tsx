@@ -7,6 +7,7 @@ import {
 } from "../src";
 import type {
   DetectionResult,
+  ImageChromeApi,
   PDFChromeApi,
   SpreadsheetChromeApi,
 } from "../src/types";
@@ -57,14 +58,23 @@ vi.mock("../src/detect/detectFileKind", () => ({
 vi.mock("../src/renderers/ImageRenderer", () => ({
   ImageRenderer: ({
     objectUrl,
+    zoom,
     onError,
+    onStepZoom,
+    onResetZoom,
   }: {
     objectUrl: string;
+    zoom: number;
     onError: (error: Error) => void;
+    onStepZoom: () => void;
+    onResetZoom: () => void;
   }) => (
     <img
+      data-renderer="image"
+      data-zoom={zoom}
       src={objectUrl}
       alt="Rendered file"
+      onPointerUp={() => onStepZoom()}
       onError={() => onError(new Error("Failed to render image."))}
     />
   ),
@@ -171,6 +181,9 @@ describe("FileViewer", () => {
   const isPDFChromeApi = (api: FileViewerChromeApi): api is PDFChromeApi => {
       return api.file.kind === "pdf";
     };
+  const isImageChromeApi = (api: FileViewerChromeApi): api is ImageChromeApi => {
+    return api.file.kind === "image";
+  };
 
 
   function mockResolvedSource(detection: DetectionResult) {
@@ -640,6 +653,69 @@ describe("FileViewer", () => {
     expect(
       findAllByText(renderer, "PDF renderer page=2 zoom=110").length,
     ).toBeGreaterThan(0);
+  });
+
+  it("lets custom chrome drive image zoom state", async () => {
+    mockResolvedSource({
+      kind: "image",
+      mimeType: "image/png",
+    });
+
+    function ImageChrome({ api }: { api: FileViewerChromeApi }) {
+      if (!isImageChromeApi(api)) {
+        return <div data-chrome-kind={api.file.kind}>{api.file.kind}</div>;
+      }
+
+      return (
+        <div data-chrome-kind="image">
+          <span>{`zoom:${api.image.zoom}`}</span>
+          <button type="button" onClick={api.image.zoomIn}>
+            Zoom in
+          </button>
+        </div>
+      );
+    }
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome={ImageChrome} />);
+    });
+
+    await waitFor(() => renderer?.root.findAllByProps({ "data-renderer": "image" })[0] ?? null);
+
+    const zoomInButton = renderer?.root
+      .findAll((node) => node.type === "button")
+      .find((button) => button.children.join("") === "Zoom in");
+
+    await act(async () => {
+      zoomInButton?.props.onClick();
+    });
+
+    expect(findAllByText(renderer, "zoom:110").length).toBeGreaterThan(0);
+    const image = renderer?.root.findAllByProps({ "data-renderer": "image" })[0];
+    expect(image?.props["data-zoom"]).toBe(110);
+  });
+
+  it("passes zoom callbacks to ImageRenderer when chrome is none", async () => {
+    mockResolvedSource({
+      kind: "image",
+      mimeType: "image/png",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome="none" />);
+    });
+
+    const image = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "image" })[0] ?? null,
+    );
+
+    expect(image.props["data-zoom"]).toBe(100);
+
+    await act(async () => {
+      image.props.onPointerUp({ pointerId: 1, stopPropagation: () => undefined });
+    });
+
+    expect(renderer?.root.findAllByProps({ "data-renderer": "image" })[0]?.props["data-zoom"]).toBe(150);
   });
 
   it("routes renderer failures through renderFallback and onError", async () => {
