@@ -1,23 +1,23 @@
 import type { ReactNode } from "react";
 import { PdfPageInput } from "./primitives/PdfPageInput";
 import { ViewerButton } from "./primitives/ViewerButton";
-import type { FileViewerChromeApi } from "./types";
+import type { FileViewerChromeApi, ImageChromeApi, PDFChromeApi, SpreadsheetChromeApi } from "./types";
 
 interface FileViewerDefaultChromeProps {
   api: FileViewerChromeApi;
 }
 
-function isPdfChromeApi(api: FileViewerChromeApi): api is Extract<FileViewerChromeApi, { file: { kind: "pdf" } }> {
+function isPdfChromeApi(api: FileViewerChromeApi): api is PDFChromeApi {
   return api.file.kind === "pdf";
 }
 
-function isImageChromeApi(api: FileViewerChromeApi): api is Extract<FileViewerChromeApi, { file: { kind: "image" } }> {
+function isImageChromeApi(api: FileViewerChromeApi): api is ImageChromeApi {
   return api.file.kind === "image";
 }
 
 function isSpreadsheetChromeApi(
   api: FileViewerChromeApi,
-): api is Extract<FileViewerChromeApi, { file: { kind: "spreadsheet" } }> {
+): api is SpreadsheetChromeApi {
   return api.file.kind === "spreadsheet";
 }
 
