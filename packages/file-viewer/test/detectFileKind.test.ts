@@ -14,6 +14,20 @@ describe("detectFileKind", () => {
     expect(result.kind).toBe("image");
   });
 
+  it("detects little-endian TIFF by magic bytes", async () => {
+    const blob = new Blob([new Uint8Array([0x49, 0x49, 0x2a, 0x00])], {
+      type: "application/octet-stream",
+    });
+    const result = await detectFileKind(blob);
+    expect(result).toEqual({ kind: "image", mimeType: "image/tiff" });
+  });
+
+  it("detects big-endian TIFF by magic bytes", async () => {
+    const blob = new Blob([new Uint8Array([0x4d, 0x4d, 0x00, 0x2a])]);
+    const result = await detectFileKind(blob);
+    expect(result).toEqual({ kind: "image", mimeType: "image/tiff" });
+  });
+
   it("detects spreadsheet for text csv", async () => {
     const blob = new Blob(["col1,col2\n1,2\n"], { type: "text/csv" });
     const result = await detectFileKind(blob);

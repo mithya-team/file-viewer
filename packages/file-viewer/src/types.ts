@@ -36,6 +36,13 @@ export type ImageChromeApi = {
     setZoom: (zoom: number) => void;
     stepZoomIn: () => void;
     resetZoom: () => void;
+    page: number;
+    pageCount: number;
+    canPrev: boolean;
+    canNext: boolean;
+    prevPage: () => void;
+    nextPage: () => void;
+    setPage: (page: number) => void;
   };
 };
 export type PDFChromeApi = {

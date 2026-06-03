@@ -56,6 +56,25 @@ export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
   } else if (isImageChromeApi(api)) {
     controls = (
       <div className="flex items-center gap-2">
+        {api.image.pageCount > 1 && (
+          <>
+            <ViewerButton onClick={api.image.prevPage} disabled={!api.image.canPrev}>
+              Prev
+            </ViewerButton>
+            <PdfPageInput
+              key={api.image.page}
+              page={api.image.page}
+              pageCount={api.image.pageCount}
+              setPage={api.image.setPage}
+            />
+            <span className="text-(--file-viewer-foreground,#334155)">
+              / {api.image.pageCount}
+            </span>
+            <ViewerButton onClick={api.image.nextPage} disabled={!api.image.canNext}>
+              Next
+            </ViewerButton>
+          </>
+        )}
         <ViewerButton onClick={api.image.zoomOut}>-</ViewerButton>
         <span className="text-(--file-viewer-foreground,#334155)">{api.image.zoom}%</span>
         <ViewerButton onClick={api.image.zoomIn}>+</ViewerButton>

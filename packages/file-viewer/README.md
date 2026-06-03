@@ -112,7 +112,7 @@ All source types are buffered to a `Blob` before rendering.
 
 Supported file families:
 
-- images: JPEG, PNG, GIF, WebP
+- images: JPEG, PNG, GIF, WebP, classical TIFF (`image/tiff`, including multi-page scroll view)
 - PDF
 - spreadsheets: XLSX, XLS, CSV
 - Word documents: DOCX, DOTX
@@ -229,7 +229,9 @@ Notes:
 - custom spreadsheet chrome should branch on `api.file.mimeType`
 - built-in chrome is hidden for unsupported files, but custom chrome can still receive `api.file.kind === "unsupported"`
 - images expose `api.image.zoom`, toolbar `zoomIn` / `zoomOut` (±10%, clamped 40–200%), `setZoom`, `stepZoomIn` (sequential click steps), and `resetZoom` (100%)
-- with `chrome="none"`, single-click step zoom and double-click reset still work on the image viewport
+- multi-page TIFF also exposes `api.image.page`, `pageCount`, `prevPage`, `nextPage`, and `setPage` (scroll-synced, same model as PDF)
+- TIFF pages are decoded lazily near the viewport; download uses the original TIFF bytes
+- with `chrome="none"`, single-click step zoom and double-click reset still work on the native image viewport (not on TIFF scroll pages)
 
 ## Fallbacks And Errors
 

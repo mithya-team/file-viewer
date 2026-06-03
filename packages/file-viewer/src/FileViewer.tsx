@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectFileKind } from "./detect/detectFileKind";
 import { FileViewerDefaultChrome } from "./FileViewerDefaultChrome";
+import { isTiffDetection } from "./image/isTiff";
 import { ViewerStatus } from "./primitives/ViewerStatus";
 import { DocxRenderer } from "./renderers/DocxRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
 import { PdfRenderer } from "./renderers/PdfRenderer";
+import { TiffRenderer } from "./renderers/TiffRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./renderers/rendererViewport";
 import { TextRenderer } from "./renderers/TextRenderer";
@@ -32,7 +34,7 @@ function sourceTypeOf(source: FileViewerProps["source"]): "string" | "blob" | "s
   return "stream";
 }
 
-function setPdfPageWithinBounds(page: number, pageCount: number) {
+function setPageWithinBounds(page: number, pageCount: number) {
   return Math.min(Math.max(page, 1), Math.max(pageCount, 1));
 }
 
@@ -49,12 +51,15 @@ function createChromeApi({
   pdfPageCount,
   pdfZoom,
   imageZoom,
+  imagePage,
+  imagePageCount,
   sheetNames,
   activeSheetIndex,
   setActiveSheetIndex,
   setPdfPage,
   setPdfZoom,
   setImageZoom,
+  setImagePage,
 }: {
   detection: DetectionResult;
   downloadUrl: string | null;
@@ -62,12 +67,15 @@ function createChromeApi({
   pdfPageCount: number;
   pdfZoom: number;
   imageZoom: number;
+  imagePage: number;
+  imagePageCount: number;
   sheetNames: string[];
   activeSheetIndex: number;
   setActiveSheetIndex: (index: number) => void;
   setPdfPage: (page: number) => void;
   setPdfZoom: (zoom: number) => void;
   setImageZoom: (zoom: number) => void;
+  setImagePage: (page: number) => void;
 }): FileViewerChromeApi {
   switch (detection.kind) {
     case "image":
@@ -84,6 +92,13 @@ function createChromeApi({
           setZoom: (zoom) => setImageZoom(clampImageZoom(zoom)),
           stepZoomIn: () => setImageZoom(zoomAfterImageClick(imageZoom)),
           resetZoom: () => setImageZoom(DEFAULT_IMAGE_ZOOM),
+          page: imagePage,
+          pageCount: imagePageCount,
+          canPrev: imagePage > 1,
+          canNext: imagePage < imagePageCount,
+          prevPage: () => setImagePage(imagePage - 1),
+          nextPage: () => setImagePage(imagePage + 1),
+          setPage: (page) => setImagePage(page),
         },
       };
     case "pdf":
@@ -161,12 +176,15 @@ export function FileViewer({
   onError,
 }: FileViewerProps) {
   const [state, setState] = useState<ViewerState>({ status: "loading" });
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<Error | null>(null);
   const [pdfPage, setPdfPage] = useState(1);
   const [pdfPageCount, setPdfPageCount] = useState(1);
   const [pdfZoom, setPdfZoom] = useState(100);
   const [imageZoom, setImageZoom] = useState(DEFAULT_IMAGE_ZOOM);
+  const [imagePage, setImagePage] = useState(1);
+  const [imagePageCount, setImagePageCount] = useState(1);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const onErrorRef = useRef(onError);
@@ -204,20 +222,51 @@ export function FileViewer({
     setPdfPageCount(1);
     setPdfZoom(100);
     setImageZoom(DEFAULT_IMAGE_ZOOM);
+    setImagePage(1);
+    setImagePageCount(1);
     setSheetNames([]);
     setActiveSheetIndex(0);
   }, [source]);
 
   useEffect(() => {
-    setPdfPage((current) => setPdfPageWithinBounds(current, pdfPageCount));
+    setPdfPage((current) => setPageWithinBounds(current, pdfPageCount));
   }, [pdfPageCount]);
 
   useEffect(() => {
+    setImagePage((current) => setPageWithinBounds(current, imagePageCount));
+  }, [imagePageCount]);
+
+  useEffect(() => {
     setRenderError(null);
-  }, [pdfPage, pdfZoom, imageZoom, activeSheetIndex]);
+  }, [pdfPage, pdfZoom, imageZoom, imagePage, activeSheetIndex]);
 
   useEffect(() => {
     if (state.status !== "ready") {
+      setDownloadUrl((old) => {
+        if (old != null) URL.revokeObjectURL(old);
+        return null;
+      });
+      return;
+    }
+    const url = URL.createObjectURL(state.blob);
+    setDownloadUrl((old) => {
+      if (old != null) URL.revokeObjectURL(old);
+      return url;
+    });
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [state]);
+
+  useEffect(() => {
+    if (state.status !== "ready") {
+      setObjectUrl((old) => {
+        if (old != null) URL.revokeObjectURL(old);
+        return null;
+      });
+      return;
+    }
+    if (isTiffDetection(state.detection)) {
       setObjectUrl((old) => {
         if (old != null) URL.revokeObjectURL(old);
         return null;
@@ -272,19 +321,34 @@ export function FileViewer({
     if (state.status !== "ready" && state.status !== "unsupported") return null;
     return createChromeApi({
       detection: state.detection,
-      downloadUrl: state.status === "ready" ? objectUrl : null,
+      downloadUrl: state.status === "ready" ? downloadUrl : null,
       pdfPage,
       pdfPageCount,
       pdfZoom,
       imageZoom,
+      imagePage,
+      imagePageCount,
       sheetNames,
       activeSheetIndex,
       setActiveSheetIndex,
-      setPdfPage: (page) => setPdfPage(setPdfPageWithinBounds(page, pdfPageCount)),
+      setPdfPage: (page) => setPdfPage(setPageWithinBounds(page, pdfPageCount)),
       setPdfZoom: (zoom) => setPdfZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
       setImageZoom: (zoom) => setImageZoom(clampImageZoom(zoom)),
+      setImagePage: (page) => setImagePage(setPageWithinBounds(page, imagePageCount)),
     });
-  }, [activeSheetIndex, objectUrl, pdfPage, pdfPageCount, pdfZoom, imageZoom, sheetNames, state]);
+  }, [
+    activeSheetIndex,
+    downloadUrl,
+    imagePage,
+    imagePageCount,
+    objectUrl,
+    pdfPage,
+    pdfPageCount,
+    pdfZoom,
+    imageZoom,
+    sheetNames,
+    state,
+  ]);
 
   const chromeContent = useMemo(() => {
     if (chromeApi == null || chrome === "none") return null;
@@ -299,7 +363,21 @@ export function FileViewer({
   const readyContent = state.status !== "ready" || renderError != null ? fallback : (
     <>
       {state.detection.kind === "text" && <TextRenderer blob={state.blob} onError={handleRenderError} />}
-      {state.detection.kind === "image" && objectUrl != null && (
+      {state.detection.kind === "image" && isTiffDetection(state.detection) && (
+        <TiffRenderer
+          blob={state.blob}
+          page={imagePage}
+          zoom={imageZoom}
+          onError={handleRenderError}
+          onPageCountChange={setImagePageCount}
+          onVisiblePageChange={(visiblePage) =>
+            setImagePage(setPageWithinBounds(visiblePage, imagePageCount))
+          }
+        />
+      )}
+      {state.detection.kind === "image"
+        && !isTiffDetection(state.detection)
+        && objectUrl != null && (
         <ImageRenderer
           objectUrl={objectUrl}
           zoom={imageZoom}
@@ -325,7 +403,7 @@ export function FileViewer({
           onError={handleRenderError}
           onPageCountChange={setPdfPageCount}
           onVisiblePageChange={(visiblePage) =>
-            setPdfPage(setPdfPageWithinBounds(visiblePage, pdfPageCount))
+            setPdfPage(setPageWithinBounds(visiblePage, pdfPageCount))
           }
         />
       )}

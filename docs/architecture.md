@@ -4,7 +4,7 @@ Build a React file-viewer package that exports one simple component for images, 
 
 Supported v1 formats:
 
-- Images: common browser-supported image MIME types
+- Images: browser-native raster types (JPEG, PNG, GIF, WebP) plus classical TIFF (`image/tiff`), including multi-page TIFF rendered as a lazy-decoded vertical scroll stack (UTIF.js)
 - Spreadsheets: `xlsx`, `xls`, `csv`
 - Documents: `pdf`, `docx`, `dotx`
 - Text: `txt` and other text payloads when loaded MIME data identifies them as text

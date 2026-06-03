@@ -55,6 +55,37 @@ vi.mock("../src/detect/detectFileKind", () => ({
   detectFileKind: detectFileKindMock,
 }));
 
+vi.mock("../src/renderers/TiffRenderer", () => {
+  const { useEffect } = require("react") as typeof import("react");
+  return {
+    TiffRenderer: ({
+      page,
+      zoom,
+      onPageCountChange,
+      onVisiblePageChange,
+    }: {
+      page: number;
+      zoom: number;
+      onPageCountChange: (count: number) => void;
+      onVisiblePageChange?: (page: number) => void;
+    }) => {
+      useEffect(() => {
+        onPageCountChange(2);
+      }, [onPageCountChange]);
+      return (
+        <div
+          data-renderer="tiff"
+          data-page={page}
+          data-zoom={zoom}
+          onClick={() => onVisiblePageChange?.(2)}
+        >
+          TIFF renderer
+        </div>
+      );
+    },
+  };
+});
+
 vi.mock("../src/renderers/ImageRenderer", () => ({
   ImageRenderer: ({
     objectUrl,
@@ -693,6 +724,36 @@ describe("FileViewer", () => {
     expect(findAllByText(renderer, "zoom:110").length).toBeGreaterThan(0);
     const image = renderer?.root.findAllByProps({ "data-renderer": "image" })[0];
     expect(image?.props["data-zoom"]).toBe(110);
+  });
+
+  it("routes TIFF to TiffRenderer and exposes page chrome API", async () => {
+    mockResolvedSource({
+      kind: "image",
+      mimeType: "image/tiff",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome="default" />);
+    });
+
+    const tiff = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "tiff" })[0] ?? null,
+    );
+    expect(tiff).not.toBeNull();
+    expect(renderer?.root.findAllByProps({ "data-renderer": "image" })).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(findAllByText(renderer, "Prev").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Next").length).toBeGreaterThan(0);
+
+    await act(async () => {
+      tiff.props.onClick();
+    });
+
+    expect(tiff.props["data-page"]).toBe(2);
   });
 
   it("passes zoom callbacks to ImageRenderer when chrome is none", async () => {

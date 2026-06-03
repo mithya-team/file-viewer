@@ -90,6 +90,20 @@ export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
   if (startsWith(sampleBytes, [0x52, 0x49, 0x46, 0x46]) && sampleBytes[8] === 0x57 && sampleBytes[9] === 0x45) {
     return { kind: "image", mimeType: normalizedMime || "image/webp" };
   }
+  if (startsWith(sampleBytes, [0x49, 0x49, 0x2a, 0x00])) {
+    return {
+      kind: "image",
+      mimeType:
+        normalizedMime.startsWith("image/") ? normalizedMime : "image/tiff",
+    };
+  }
+  if (startsWith(sampleBytes, [0x4d, 0x4d, 0x00, 0x2a])) {
+    return {
+      kind: "image",
+      mimeType:
+        normalizedMime.startsWith("image/") ? normalizedMime : "image/tiff",
+    };
+  }
   if (startsWith(sampleBytes, [0xd0, 0xcf, 0x11, 0xe0])) {
     if (inferOleSpreadsheet(sampleBytes)) {
       return {
