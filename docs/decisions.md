@@ -171,3 +171,11 @@ Consequence: Workspace wiring (`pnpm-workspace.yaml`, package names, scripts) is
 ### 22. Demo should also use Tailwind
 
 Decision: The demo should use tailwind
+
+### 23. Classical TIFF Uses UTIF And Scroll Stack
+
+Decision: Classical TIFF (`II*\0` / `MM\0*`, `image/tiff`) stays `kind: "image"` but routes to an internal `TiffRenderer` instead of `<img src="blob:…">`. Pages decode lazily near the viewport via vendored UTIF.js; display uses PNG `blob:` URLs; download keeps the original TIFF blob.
+
+Rationale: Browsers do not reliably render TIFF in `<img>`. Multi-page faxes/scans need PDF-like scroll UX, not single-page flip. Session `Map` of display URLs (no LRU) matches lazy decode — memory grows with pages the user scrolls to.
+
+Consequence: `ImageChromeApi` gains page fields for TIFF; JPEG/PNG keep `pageCount === 1`. BigTIFF and arbitrary cache caps are out of v1. Pointer step-zoom applies to native `ImageRenderer` only, not TIFF scroll pages.

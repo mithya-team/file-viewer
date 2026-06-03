@@ -1,6 +1,6 @@
 # Project: file-viewer
 
-A React-based file-viewer library that provides a single `FileViewer` component capable of rendering various file formats (images, spreadsheets, PDFs, Word documents, and text) based on content detection.
+A React-based file-viewer library that provides a single `FileViewer` component capable of rendering various file formats (images including classical TIFF, spreadsheets, PDFs, Word documents, and text) based on content detection.
 
 ## Project Overview
 
@@ -16,7 +16,9 @@ A React-based file-viewer library that provides a single `FileViewer` component 
 ## Directory Structure
 
 - `packages/file-viewer/`: The main library package.
-    - `src/renderers/`: Internal renderer implementations (PDF, DOCX, Image, etc.).
+    - `src/renderers/`: Internal renderer implementations (PDF, DOCX, Image, TiffRenderer, etc.).
+    - `src/image/`: Image helpers (zoom, TIFF decode, `isTiff`).
+    - `src/vendor/`: Vendored decode libs (e.g. UTIF.js for TIFF).
     - `src/source/`: Logic for loading and classifying sources.
     - `src/primitives/`: Design system components (generated/copied via Mithya UI CLI).
 - `apps/playground/`: Demo application for testing the viewer (referred to as `apps/demo` in some docs).
@@ -63,11 +65,18 @@ A React-based file-viewer library that provides a single `FileViewer` component 
   pnpm test
   ```
 
+## Supported image formats (v1)
+
+- Browser-native: JPEG, PNG, GIF, WebP via `ImageRenderer` (single `<img>`, zoom/pan).
+- Classical TIFF (`image/tiff`): magic-byte sniff + `TiffRenderer` — multi-page vertical scroll, lazy UTIF decode per page, `ImageChromeApi` page nav when `pageCount > 1`. Download uses original TIFF bytes.
+- Not in v1: BigTIFF, multi‑GB single-plane TIFF.
+
 ## Future Work
 
 - PPTX support is explicitly out of scope for v1.
 - Custom renderer registration is future work.
 - Progressive rendering is future work.
+- BigTIFF / exotic TIFF compression gaps as needed.
 
 ## Code patterns
 
