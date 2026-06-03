@@ -65,6 +65,35 @@ export function DemoViewerChrome({ api, initialPage }: DemoViewerChromeProps) {
       )}
       {isImageChromeApi(api) && (
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {api.image.pageCount > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={api.image.prevPage}
+                disabled={!api.image.canPrev}
+                className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <DemoPdfPageInput
+                key={api.file.downloadUrl ?? "tiff"}
+                documentKey={api.file.downloadUrl ?? undefined}
+                initialPage={initialPage}
+                page={api.image.page}
+                pageCount={api.image.pageCount}
+                setPage={api.image.setPage}
+              />
+              <span>/ {api.image.pageCount}</span>
+              <button
+                type="button"
+                onClick={api.image.nextPage}
+                disabled={!api.image.canNext}
+                className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={api.image.zoomOut}

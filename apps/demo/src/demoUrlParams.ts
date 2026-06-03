@@ -1,4 +1,13 @@
-export type DemoFileType = "text" | "csv" | "image" | "pdf" | "docx" | "dotx" | "xlsx";
+export type DemoFileType =
+  | "text"
+  | "csv"
+  | "image"
+  | "tiffMulti"
+  | "tiffLarge"
+  | "pdf"
+  | "docx"
+  | "dotx"
+  | "xlsx";
 export type SourceMode = "url" | "blob" | "base64" | "stream";
 export type DemoScenario = "normal" | "unsupported" | "error";
 export type ChromeMode = "default" | "none" | "custom";
@@ -16,6 +25,8 @@ const FILE_TYPES: readonly DemoFileType[] = [
   "text",
   "csv",
   "image",
+  "tiffMulti",
+  "tiffLarge",
   "pdf",
   "docx",
   "dotx",
