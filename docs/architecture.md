@@ -6,10 +6,10 @@ Supported v1 formats:
 
 - Images: browser-native raster types (JPEG, PNG, GIF, WebP) plus classical TIFF (`image/tiff`), including multi-page TIFF rendered as a lazy-decoded vertical scroll stack (UTIF.js)
 - Spreadsheets: `xlsx`, `xls`, `csv`
-- Documents: `pdf`, `docx`, `dotx`
+- Documents: `pdf`, `docx`, `dotx`, `pptx`, `potx`
 - Text: `txt` and other text payloads when loaded MIME data identifies them as text
 
-PPTX is future work.
+`pptx` / `potx` use internal `PptxRenderer` on **[Pagus](https://github.com/pagus-kit/Pagus)** (`@pagus-kit/core` + `@pagus-kit/renderer`, pinned at `0.1.1`). Buffered `Blob` → `parse` → per-slide `renderSlide` SVG inside package chrome. Static preview only.
 
 ## Package Shape
 

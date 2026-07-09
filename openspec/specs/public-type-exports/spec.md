@@ -25,6 +25,7 @@
 - `SpreadsheetChromeApi`
 - `DocxChromeApi`
 - `TextChromeApi`
+- `PptxChromeApi`
 - `UnsupportedChromeApi`
 
 **Source classification**
@@ -38,6 +39,7 @@
 - `SpreadsheetRendererProps`
 - `DocxRendererProps`
 - `TextRendererProps`
+- `PptxRendererProps`
 
 **PDF search**
 
@@ -117,4 +119,35 @@ alongside existing `objectUrl` and `onError` fields.
 
 - **WHEN** a consumer writes `import type { ImageRendererProps } from "@file-viewer/react"`
 - **THEN** TypeScript SHALL require `zoom`, `onStepZoom`, and `onResetZoom` when typing full props
+
+### Requirement: PptxChromeApi exported from package entry
+
+`@file-viewer/react` SHALL re-export `PptxChromeApi` from its primary entrypoint. When `api.file.kind` is `"pptx"`, `FileViewerChromeApi` SHALL narrow to `PptxChromeApi` with:
+
+- `file: { kind: "pptx"; mimeType: string; downloadUrl: string | null }`
+- `pptx: { page, pageCount, zoom, canPrev, canNext, prevPage, nextPage, setPage, zoomIn, zoomOut, setZoom }`
+
+#### Scenario: Consumer narrows pptx chrome API
+
+- **WHEN** a consumer writes `if (api.file.kind === "pptx") api.pptx.setPage(2);`
+- **THEN** TypeScript SHALL resolve `api.pptx.setPage` without error
+
+### Requirement: PptxRendererProps type-only export
+
+`PptxRendererProps` SHALL be exported as a type-only export documenting `blob`, `page`, `zoom`, `onError`, `onPageCountChange`, and optional `onVisiblePageChange`. The `PptxRenderer` component SHALL NOT be exported.
+
+#### Scenario: Consumer imports PptxRendererProps
+
+- **WHEN** a consumer writes `import type { PptxRendererProps } from "@file-viewer/react"`
+- **THEN** TypeScript SHALL resolve the type
+- **AND** `PptxRenderer` SHALL NOT be importable from the package entry
+
+### Requirement: FileKind includes pptx
+
+`FileKind` and `DetectionResult` exported from the package entry SHALL include the `"pptx"` variant.
+
+#### Scenario: Consumer handles pptx in FileKind switch
+
+- **WHEN** a consumer switches on `DetectionResult["kind"]`
+- **THEN** TypeScript SHALL require handling `"pptx"` for exhaustiveness
 

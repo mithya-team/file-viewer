@@ -8,6 +8,7 @@ interface DemoViewerChromeProps {
 
 type DemoPdfChromeApi = Extract<FileViewerChromeApi, { file: { kind: "pdf" } }>;
 type DemoImageChromeApi = Extract<FileViewerChromeApi, { file: { kind: "image" } }>;
+type DemoPptxChromeApi = Extract<FileViewerChromeApi, { file: { kind: "pptx" } }>;
 type DemoSpreadsheetChromeApi = Extract<FileViewerChromeApi, { file: { kind: "spreadsheet" } }>;
 
 export function DemoViewerChrome({ api, initialPage }: DemoViewerChromeProps) {
@@ -111,6 +112,50 @@ export function DemoViewerChrome({ api, initialPage }: DemoViewerChromeProps) {
           </button>
         </div>
       )}
+      {isPptxChromeApi(api) && (
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={api.pptx.prevPage}
+            disabled={!api.pptx.canPrev}
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Prev
+          </button>
+          <DemoPdfPageInput
+            key={api.file.downloadUrl ?? "pptx"}
+            documentKey={api.file.downloadUrl ?? undefined}
+            initialPage={initialPage}
+            page={api.pptx.page}
+            pageCount={api.pptx.pageCount}
+            setPage={api.pptx.setPage}
+          />
+          <span>/ {api.pptx.pageCount}</span>
+          <button
+            type="button"
+            onClick={api.pptx.nextPage}
+            disabled={!api.pptx.canNext}
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next
+          </button>
+          <button
+            type="button"
+            onClick={api.pptx.zoomOut}
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
+          >
+            -
+          </button>
+          <span>{api.pptx.zoom}%</span>
+          <button
+            type="button"
+            onClick={api.pptx.zoomIn}
+            className="cursor-pointer rounded border border-slate-600 px-2 py-1 text-slate-100 transition hover:border-slate-400"
+          >
+            +
+          </button>
+        </div>
+      )}
       {isSpreadSheetChromeApi(api) && (
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {api.file.mimeType === "text/csv" ? (
@@ -152,6 +197,10 @@ const isPDFChromeApi = (api: FileViewerChromeApi): api is DemoPdfChromeApi => {
 
 const isImageChromeApi = (api: FileViewerChromeApi): api is DemoImageChromeApi => {
   return api.file.kind === "image";
+};
+
+const isPptxChromeApi = (api: FileViewerChromeApi): api is DemoPptxChromeApi => {
+  return api.file.kind === "pptx";
 };
 
 const isSpreadSheetChromeApi = (

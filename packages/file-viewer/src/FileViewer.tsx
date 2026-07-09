@@ -5,6 +5,7 @@ import { isTiffDetection } from "./image/isTiff";
 import { ViewerStatus } from "./primitives/ViewerStatus";
 import { DocxRenderer } from "./renderers/DocxRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
+import { PptxRenderer } from "./renderers/PptxRenderer";
 import { PdfRenderer } from "./renderers/PdfRenderer";
 import { TiffRenderer } from "./renderers/TiffRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
@@ -53,6 +54,9 @@ function createChromeApi({
   imageZoom,
   imagePage,
   imagePageCount,
+  pptxPage,
+  pptxPageCount,
+  pptxZoom,
   sheetNames,
   activeSheetIndex,
   setActiveSheetIndex,
@@ -60,6 +64,8 @@ function createChromeApi({
   setPdfZoom,
   setImageZoom,
   setImagePage,
+  setPptxPage,
+  setPptxZoom,
 }: {
   detection: DetectionResult;
   downloadUrl: string | null;
@@ -69,6 +75,9 @@ function createChromeApi({
   imageZoom: number;
   imagePage: number;
   imagePageCount: number;
+  pptxPage: number;
+  pptxPageCount: number;
+  pptxZoom: number;
   sheetNames: string[];
   activeSheetIndex: number;
   setActiveSheetIndex: (index: number) => void;
@@ -76,6 +85,8 @@ function createChromeApi({
   setPdfZoom: (zoom: number) => void;
   setImageZoom: (zoom: number) => void;
   setImagePage: (page: number) => void;
+  setPptxPage: (page: number) => void;
+  setPptxZoom: (zoom: number) => void;
 }): FileViewerChromeApi {
   switch (detection.kind) {
     case "image":
@@ -146,6 +157,27 @@ function createChromeApi({
           downloadUrl,
         },
       };
+    case "pptx":
+      return {
+        file: {
+          kind: "pptx",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+        pptx: {
+          page: pptxPage,
+          pageCount: pptxPageCount,
+          zoom: pptxZoom,
+          canPrev: pptxPage > 1,
+          canNext: pptxPage < pptxPageCount,
+          prevPage: () => setPptxPage(pptxPage - 1),
+          nextPage: () => setPptxPage(pptxPage + 1),
+          setPage: (page) => setPptxPage(page),
+          zoomIn: () => setPptxZoom(pptxZoom + 10),
+          zoomOut: () => setPptxZoom(pptxZoom - 10),
+          setZoom: (zoom) => setPptxZoom(zoom),
+        },
+      };
     case "text":
       return {
         file: {
@@ -185,6 +217,9 @@ export function FileViewer({
   const [imageZoom, setImageZoom] = useState(DEFAULT_IMAGE_ZOOM);
   const [imagePage, setImagePage] = useState(1);
   const [imagePageCount, setImagePageCount] = useState(1);
+  const [pptxPage, setPptxPage] = useState(1);
+  const [pptxPageCount, setPptxPageCount] = useState(1);
+  const [pptxZoom, setPptxZoom] = useState(100);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const onErrorRef = useRef(onError);
@@ -224,6 +259,9 @@ export function FileViewer({
     setImageZoom(DEFAULT_IMAGE_ZOOM);
     setImagePage(1);
     setImagePageCount(1);
+    setPptxPage(1);
+    setPptxPageCount(1);
+    setPptxZoom(100);
     setSheetNames([]);
     setActiveSheetIndex(0);
   }, [source]);
@@ -237,8 +275,12 @@ export function FileViewer({
   }, [imagePageCount]);
 
   useEffect(() => {
+    setPptxPage((current) => setPageWithinBounds(current, pptxPageCount));
+  }, [pptxPageCount]);
+
+  useEffect(() => {
     setRenderError(null);
-  }, [pdfPage, pdfZoom, imageZoom, imagePage, activeSheetIndex]);
+  }, [pdfPage, pdfZoom, imageZoom, imagePage, pptxPage, pptxZoom, activeSheetIndex]);
 
   useEffect(() => {
     if (state.status !== "ready") {
@@ -328,6 +370,9 @@ export function FileViewer({
       imageZoom,
       imagePage,
       imagePageCount,
+      pptxPage,
+      pptxPageCount,
+      pptxZoom,
       sheetNames,
       activeSheetIndex,
       setActiveSheetIndex,
@@ -335,6 +380,8 @@ export function FileViewer({
       setPdfZoom: (zoom) => setPdfZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
       setImageZoom: (zoom) => setImageZoom(clampImageZoom(zoom)),
       setImagePage: (page) => setImagePage(setPageWithinBounds(page, imagePageCount)),
+      setPptxPage: (page) => setPptxPage(setPageWithinBounds(page, pptxPageCount)),
+      setPptxZoom: (zoom) => setPptxZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
     });
   }, [
     activeSheetIndex,
@@ -346,6 +393,9 @@ export function FileViewer({
     pdfPageCount,
     pdfZoom,
     imageZoom,
+    pptxPage,
+    pptxPageCount,
+    pptxZoom,
     sheetNames,
     state,
   ]);
@@ -408,6 +458,18 @@ export function FileViewer({
         />
       )}
       {state.detection.kind === "docx" && <DocxRenderer blob={state.blob} onError={handleRenderError} />}
+      {state.detection.kind === "pptx" && (
+        <PptxRenderer
+          blob={state.blob}
+          page={pptxPage}
+          zoom={pptxZoom}
+          onError={handleRenderError}
+          onPageCountChange={setPptxPageCount}
+          onVisiblePageChange={(visiblePage) =>
+            setPptxPage(setPageWithinBounds(visiblePage, pptxPageCount))
+          }
+        />
+      )}
     </>
   );
 

@@ -35,12 +35,13 @@ This file details what not to do when building this library/package.
 
 ## Format Scope
 
-- Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, and text files in v1.
+- Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, `pptx`, `potx`, and text files.
 - Must treat `txt` and `csv` support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic routing.
 - Must render `dotx` through the DOCX path only.
+- Must render `potx` through the PPTX path only.
 - Must not execute template behavior, embedded actions, macros, scripts, or external document side effects.
-- Must not implement PPTX in v1.
-- Must document PPTX as future work only.
+- Must use pinned Pagus packages (`@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`) and an internal `PptxRenderer` — not `@pagus-kit/react`.
+- Must keep PPTX as static preview only (no animations, editing, or presenter mode).
 
 ## Renderer Boundaries
 

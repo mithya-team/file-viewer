@@ -119,6 +119,37 @@ vi.mock("../src/renderers/DocxRenderer", () => ({
   DocxRenderer: () => <div data-renderer="docx">Docx renderer</div>,
 }));
 
+vi.mock("../src/renderers/PptxRenderer", () => {
+  const { useEffect } = require("react") as typeof import("react");
+  return {
+    PptxRenderer: ({
+      page,
+      zoom,
+      onPageCountChange,
+      onVisiblePageChange,
+    }: {
+      page: number;
+      zoom: number;
+      onPageCountChange: (count: number) => void;
+      onVisiblePageChange?: (page: number) => void;
+    }) => {
+      useEffect(() => {
+        onPageCountChange(5);
+      }, [onPageCountChange]);
+      return (
+        <div
+          data-renderer="pptx"
+          data-page={page}
+          data-zoom={zoom}
+          onClick={() => onVisiblePageChange?.(3)}
+        >
+          PPTX renderer
+        </div>
+      );
+    },
+  };
+});
+
 vi.mock("../src/renderers/PdfRenderer", () => ({
   PdfRenderer: ({
     blob,
@@ -777,6 +808,35 @@ describe("FileViewer", () => {
     });
 
     expect(renderer?.root.findAllByProps({ "data-renderer": "image" })[0]?.props["data-zoom"]).toBe(150);
+  });
+
+  it("routes PPTX to PptxRenderer and exposes page chrome API", async () => {
+    mockResolvedSource({
+      kind: "pptx",
+      mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome="default" />);
+    });
+
+    const pptx = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "pptx" })[0] ?? null,
+    );
+    expect(pptx).not.toBeNull();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(findAllByText(renderer, "Prev").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Next").length).toBeGreaterThan(0);
+
+    await act(async () => {
+      pptx.props.onClick();
+    });
+
+    expect(pptx.props["data-page"]).toBe(3);
   });
 
   it("routes renderer failures through renderFallback and onError", async () => {

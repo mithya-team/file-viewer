@@ -68,8 +68,32 @@ describe("detectFileKind", () => {
     expect(result.kind).toBe("unsupported");
   });
 
-  it("does not treat unknown zip payloads as supported openxml formats", async () => {
+  it("detects pptx by ppt/ path in zip sample", async () => {
     const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "ppt/slides/slide1.xml"], {
+      type: "application/zip",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("pptx");
+  });
+
+  it("detects potx through the pptx path", async () => {
+    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "ppt/presentation.xml"], {
+      type: "application/vnd.openxmlformats-officedocument.presentationml.template",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("pptx");
+  });
+
+  it("detects pptx by presentation MIME on zip payload", async () => {
+    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], {
+      type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("pptx");
+  });
+
+  it("does not treat unknown zip payloads as supported openxml formats", async () => {
+    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "custom/content.xml"], {
       type: "application/zip",
     });
     const result = await detectFileKind(blob);

@@ -29,6 +29,8 @@
     "verify-dist": "node ./scripts/verify-dist.mjs"
   },
   "dependencies": {
+    "@pagus-kit/core": "0.1.1",
+    "@pagus-kit/renderer": "0.1.1",
     "docx-preview": "^0.3.6",
     "jszip": "^3.10.1",
     "pdfjs-dist": "^4.10.38",

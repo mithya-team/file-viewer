@@ -7,7 +7,9 @@ export type DemoFileType =
   | "pdf"
   | "docx"
   | "dotx"
-  | "xlsx";
+  | "xlsx"
+  | "pptx"
+  | "pptx5";
 export type SourceMode = "url" | "blob" | "base64" | "stream";
 export type DemoScenario = "normal" | "unsupported" | "error";
 export type ChromeMode = "default" | "none" | "custom";
@@ -31,6 +33,8 @@ const FILE_TYPES: readonly DemoFileType[] = [
   "docx",
   "dotx",
   "xlsx",
+  "pptx",
+  "pptx5",
 ];
 const SOURCE_MODES: readonly SourceMode[] = ["url", "blob", "base64", "stream"];
 const SCENARIOS: readonly DemoScenario[] = ["normal", "unsupported", "error"];

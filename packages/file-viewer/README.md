@@ -116,11 +116,11 @@ Supported file families:
 - PDF
 - spreadsheets: XLSX, XLS, CSV
 - Word documents: DOCX, DOTX
+- presentations: PPTX, POTX (static slide preview via pinned Pagus `@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`)
 - text when MIME indicates text, including `text/plain`, other `text/*` values except `text/csv`, `application/json`, `application/xml`, and `application/javascript`
 
 Current limits:
 
-- PPTX is not supported in v1
 - renderer selection is content-driven, not extension-driven
 - unlabeled text/CSV blobs are unsupported unless loaded MIME/header data identifies them
 - progressive rendering is not supported in v1

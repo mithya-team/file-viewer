@@ -20,10 +20,11 @@ function decodeUtf8(bytes: Uint8Array): string | null {
   }
 }
 
-function inferOpenXmlKind(bytes: Uint8Array): "spreadsheet" | "docx" | null {
+function inferOpenXmlKind(bytes: Uint8Array): "spreadsheet" | "docx" | "pptx" | null {
   const latin1 = new TextDecoder("latin1").decode(bytes);
   if (latin1.includes("xl/")) return "spreadsheet";
   if (latin1.includes("word/")) return "docx";
+  if (latin1.includes("ppt/")) return "pptx";
   return null;
 }
 
@@ -67,6 +68,10 @@ const SPREADSHEET_MIME = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
   "text/csv",
+]);
+const PPTX_MIME = new Set([
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.presentationml.template",
 ]);
 
 export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
@@ -128,6 +133,9 @@ export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
   }
   if (DOCX_MIME.has(normalizedMime)) {
     return { kind: "docx", mimeType: normalizedMime };
+  }
+  if (PPTX_MIME.has(normalizedMime)) {
+    return { kind: "pptx", mimeType: normalizedMime };
   }
   if (SPREADSHEET_MIME.has(normalizedMime)) {
     return { kind: "spreadsheet", mimeType: normalizedMime };

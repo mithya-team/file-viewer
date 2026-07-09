@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { PdfPageInput } from "./primitives/PdfPageInput";
 import { ViewerButton } from "./primitives/ViewerButton";
-import type { FileViewerChromeApi, ImageChromeApi, PDFChromeApi, SpreadsheetChromeApi } from "./types";
+import type { FileViewerChromeApi, ImageChromeApi, PDFChromeApi, PptxChromeApi, SpreadsheetChromeApi } from "./types";
 
 interface FileViewerDefaultChromeProps {
   api: FileViewerChromeApi;
@@ -19,6 +19,10 @@ function isSpreadsheetChromeApi(
   api: FileViewerChromeApi,
 ): api is SpreadsheetChromeApi {
   return api.file.kind === "spreadsheet";
+}
+
+function isPptxChromeApi(api: FileViewerChromeApi): api is PptxChromeApi {
+  return api.file.kind === "pptx";
 }
 
 export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
@@ -78,6 +82,33 @@ export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
         <ViewerButton onClick={api.image.zoomOut}>-</ViewerButton>
         <span className="text-(--file-viewer-foreground,#334155)">{api.image.zoom}%</span>
         <ViewerButton onClick={api.image.zoomIn}>+</ViewerButton>
+      </div>
+    );
+  } else if (isPptxChromeApi(api)) {
+    controls = (
+      <div className="flex items-center gap-2">
+        <ViewerButton onClick={api.pptx.prevPage} disabled={!api.pptx.canPrev}>
+          Prev
+        </ViewerButton>
+        <PdfPageInput
+          key={api.pptx.page}
+          page={api.pptx.page}
+          pageCount={api.pptx.pageCount}
+          setPage={api.pptx.setPage}
+        />
+        <span className="text-(--file-viewer-foreground,#334155)">
+          / {api.pptx.pageCount}
+        </span>
+        <ViewerButton onClick={api.pptx.nextPage} disabled={!api.pptx.canNext}>
+          Next
+        </ViewerButton>
+        <ViewerButton onClick={api.pptx.zoomOut}>
+          -
+        </ViewerButton>
+        <span className="text-(--file-viewer-foreground,#334155)">{api.pptx.zoom}%</span>
+        <ViewerButton onClick={api.pptx.zoomIn}>
+          +
+        </ViewerButton>
       </div>
     );
   } else if (isSpreadsheetChromeApi(api)) {

@@ -69,11 +69,8 @@ A React-based file-viewer library that provides a single `FileViewer` component 
 
 - Browser-native: JPEG, PNG, GIF, WebP via `ImageRenderer` (single `<img>`, zoom/pan).
 - Classical TIFF (`image/tiff`): magic-byte sniff + `TiffRenderer` — multi-page vertical scroll, lazy UTIF decode per page, `ImageChromeApi` page nav when `pageCount > 1`. Download uses original TIFF bytes.
-- Not in v1: BigTIFF, multi‑GB single-plane TIFF.
-
-## Future Work
-
-- PPTX support is explicitly out of scope for v1.
+- PPTX/POTX: magic-byte / MIME sniff + `PptxRenderer` on pinned Pagus (`@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`) — lazy per-slide SVG, `PptxChromeApi` page nav + zoom. Static preview only.
+- Not in v1 scope: BigTIFF, multi‑GB single-plane TIFF.
 - Custom renderer registration is future work.
 - Progressive rendering is future work.
 - BigTIFF / exotic TIFF compression gaps as needed.

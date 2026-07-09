@@ -32,13 +32,13 @@ Rationale: PDF, DOCX, and spreadsheet libraries generally need complete buffers 
 
 Consequence: True progressive rendering is out of scope for v1.
 
-### 5. PPTX Is Future Work
+### 5. PPTX Uses Pagus (Post-v1)
 
-Decision: PPTX is not implemented in v1.
+Decision: Use **[Pagus](https://github.com/pagus-kit/Pagus)** (`@pagus-kit/core`, `@pagus-kit/renderer`) as the OOXML engine for PPTX/POTX. Pin **`@pagus-kit/core@0.1.1`** and **`@pagus-kit/renderer@0.1.1`** until upgraded deliberately. Do not use `@pagus-kit/react`; the package owns chrome and mounts per-slide SVG from `renderSlide`.
 
-Rationale: It adds a separate rendering surface beyond the requested v1 formats.
+Rationale: v1 scope excluded PPTX. Spike on `sample-files/*.pptx` showed Pagus beats alternatives on font fidelity, zoom/scaling, and SVG size for text-heavy slides. Pagus is MIT (FOSS).
 
-Consequence: The architecture can add a PPTX renderer later without changing the public API.
+Consequence: Add an internal `PptxRenderer` + content-driven `pptx` detection without changing the public `FileViewer` API. Parse once per `Blob`, render slides lazily. Animations, editing, and presenter mode stay out of scope — static preview only.
 
 ### 6. DOTX Uses DOCX Rendering
 

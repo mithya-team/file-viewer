@@ -7,6 +7,7 @@ export type FileKind =
   | "pdf"
   | "spreadsheet"
   | "docx"
+  | "pptx"
   | "text"
   | "unsupported";
 
@@ -70,8 +71,24 @@ export type SpreadsheetChromeApi = {
   };
 };
 export type DocxChromeApi = {
-      file: ChromeFileBase<"docx">;
-    }
+  file: ChromeFileBase<"docx">;
+};
+export type PptxChromeApi = {
+  file: ChromeFileBase<"pptx">;
+  pptx: {
+    page: number;
+    pageCount: number;
+    zoom: number;
+    canPrev: boolean;
+    canNext: boolean;
+    prevPage: () => void;
+    nextPage: () => void;
+    setPage: (page: number) => void;
+    zoomIn: () => void;
+    zoomOut: () => void;
+    setZoom: (zoom: number) => void;
+  };
+};
 export type TextChromeApi = {
       file: ChromeFileBase<"text">;
     }
@@ -83,6 +100,7 @@ export type FileViewerChromeApi =
   | PDFChromeApi
   | SpreadsheetChromeApi
   | DocxChromeApi
+  | PptxChromeApi
   | TextChromeApi
   | UnsupportedChromeApi
 
