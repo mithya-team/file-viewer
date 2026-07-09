@@ -27,6 +27,8 @@
 - `TextChromeApi`
 - `PptxChromeApi`
 - `UnsupportedChromeApi`
+- `PageNavigateEvent`
+- `PageNavigateListener`
 
 **Source classification**
 
@@ -94,6 +96,7 @@ Types and values used only for PDF layout, search highlighting, Tailwind class c
 - `prevPage: () => void` — go to previous page and scroll
 - `nextPage: () => void` — go to next page and scroll
 - `setPage: (page: number) => void` — set clamped page and scroll
+- `subscribePageNavigate: (listener: (event: PageNavigateEvent) => void) => () => void` — programmatic navigate settle
 
 #### Scenario: Consumer narrows image chrome API for zoom
 
@@ -125,12 +128,21 @@ alongside existing `objectUrl` and `onError` fields.
 `@file-viewer/react` SHALL re-export `PptxChromeApi` from its primary entrypoint. When `api.file.kind` is `"pptx"`, `FileViewerChromeApi` SHALL narrow to `PptxChromeApi` with:
 
 - `file: { kind: "pptx"; mimeType: string; downloadUrl: string | null }`
-- `pptx: { page, pageCount, zoom, canPrev, canNext, prevPage, nextPage, setPage, zoomIn, zoomOut, setZoom }`
+- `pptx: { page, pageCount, zoom, canPrev, canNext, prevPage, nextPage, setPage, subscribePageNavigate, zoomIn, zoomOut, setZoom }`
 
 #### Scenario: Consumer narrows pptx chrome API
 
 - **WHEN** a consumer writes `if (api.file.kind === "pptx") api.pptx.setPage(2);`
 - **THEN** TypeScript SHALL resolve `api.pptx.setPage` without error
+
+### Requirement: PageNavigateEvent and subscribePageNavigate types
+
+`@file-viewer/react` SHALL export type `PageNavigateEvent` with `page: number` and `reason: "programmatic"`. `PDFChromeApi.pdf`, `PptxChromeApi.pptx`, and `ImageChromeApi.image` SHALL include `subscribePageNavigate: (listener: (event: PageNavigateEvent) => void) => () => void`.
+
+#### Scenario: Consumer types PDF settle subscription
+
+- **WHEN** a consumer writes `if (api.file.kind === "pdf") { const unsub = api.pdf.subscribePageNavigate(() => {}); unsub(); }`
+- **THEN** TypeScript SHALL resolve `subscribePageNavigate` and `PageNavigateEvent` without error
 
 ### Requirement: PptxRendererProps type-only export
 

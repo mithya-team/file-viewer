@@ -258,11 +258,19 @@ describe("PdfRenderer", () => {
   const pageSlotHosts = new Map<number, { scrollIntoView: ReturnType<typeof vi.fn> }>();
   let originalDevicePixelRatio: number | undefined;
   let scrollIntoViewMock: ReturnType<typeof vi.fn>;
+  let scrollToMock: ReturnType<typeof vi.fn>;
+  let scrollHostRef: {
+    scrollTop: number;
+    scrollTo: ReturnType<typeof vi.fn>;
+    addEventListener: ReturnType<typeof vi.fn>;
+    removeEventListener: ReturnType<typeof vi.fn>;
+  } | null;
 
   async function renderPdfRenderer(
     element: ReactElement,
   ): Promise<ReactTestRenderer> {
     pageSlotHosts.clear();
+    scrollHostRef = null;
     await act(async () => {
       renderer = create(element, {
         createNodeMock: (node) => {
@@ -288,8 +296,36 @@ describe("PdfRenderer", () => {
               return host;
             }
             const className = node.props.className as string | undefined;
+            if (className?.includes("textLayer") || className?.includes("text-transparent")) {
+              const textLayerHost = {
+                style: { setProperty: vi.fn() },
+                replaceChildren: vi.fn(),
+                dataset: {},
+                getBoundingClientRect: () => ({
+                  top: 0,
+                  bottom: 100,
+                  left: 0,
+                  right: 100,
+                }),
+                querySelectorAll: () => [],
+              };
+              const textRef = node.props.ref as
+                | ((instance: typeof textLayerHost | null) => void)
+                | { current?: typeof textLayerHost | null }
+                | null;
+              if (typeof textRef === "function") {
+                textRef(textLayerHost);
+              } else if (textRef != null && "current" in textRef) {
+                textRef.current = textLayerHost;
+              }
+              return textLayerHost;
+            }
             if (className?.includes("bg-transparent")) {
               const scrollHost = {
+                scrollTop: 0,
+                scrollTo: scrollToMock,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
                 getBoundingClientRect: () => ({
                   top: 0,
                   bottom: 200,
@@ -303,6 +339,7 @@ describe("PdfRenderer", () => {
                 },
                 querySelectorAll: () => Array.from(pageSlotHosts.values()),
               };
+              scrollHostRef = scrollHost;
               const ref = node.props.ref as
                 | ((instance: typeof scrollHost | null) => void)
                 | { current?: typeof scrollHost | null }
@@ -314,7 +351,7 @@ describe("PdfRenderer", () => {
               }
               return scrollHost;
             }
-            return {
+            const host = {
               style: { setProperty: vi.fn() },
               replaceChildren: vi.fn(),
               dataset: {},
@@ -326,6 +363,16 @@ describe("PdfRenderer", () => {
               }),
               querySelectorAll: () => [],
             };
+            const ref = node.props.ref as
+              | ((instance: typeof host | null) => void)
+              | { current?: typeof host | null }
+              | null;
+            if (typeof ref === "function") {
+              ref(host);
+            } else if (ref != null && "current" in ref) {
+              ref.current = host;
+            }
+            return host;
           }
           return null;
         },
@@ -367,6 +414,11 @@ describe("PdfRenderer", () => {
       value: 2,
     });
     scrollIntoViewMock = vi.fn();
+    scrollToMock = vi.fn((options?: ScrollToOptions | number) => {
+      if (scrollHostRef != null && typeof options === "object" && options?.top != null) {
+        scrollHostRef.scrollTop = options.top;
+      }
+    });
   });
 
   afterEach(async () => {
@@ -490,6 +542,54 @@ describe("PdfRenderer", () => {
     expect(pageTwoSlot).toBeDefined();
   });
 
+  it("smooth-scrolls on page change after user-visible page and settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const onSettled = vi.fn();
+      const blob = createPdfLikeBlob(128);
+      getDocumentMock.mockImplementation(() => ({
+        promise: Promise.resolve(createFakePdfDocument(3)),
+      }));
+
+      await renderPdfRenderer(
+        <PdfRenderer
+          {...defaultProps({
+            blob,
+            page: 1,
+            onProgrammaticPageNavigateSettled: onSettled,
+          })}
+        />,
+      );
+      await waitFor(() =>
+        collectPageSlots(renderer!.root).length === 3 ? true : null,
+      );
+      await flush();
+      onSettled.mockClear();
+      scrollToMock.mockClear();
+
+      await act(async () => {
+        renderer?.update(
+          <PdfRenderer
+            {...defaultProps({
+              blob,
+              page: 3,
+              onProgrammaticPageNavigateSettled: onSettled,
+            })}
+          />,
+        );
+      });
+      await flush();
+      await act(async () => {
+        vi.advanceTimersByTime(900);
+      });
+
+      expect(scrollToMock).toHaveBeenCalled();
+      expect(onSettled).toHaveBeenCalledWith(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports visible page via onVisiblePageChange", async () => {
     const onVisiblePageChange = vi.fn();
     getDocumentMock.mockImplementation(() => ({
@@ -502,6 +602,8 @@ describe("PdfRenderer", () => {
     await waitFor(() =>
       collectPageSlots(renderer!.root).length === 3 ? true : null,
     );
+    await flush();
+    expect(visibleObservers.length).toBeGreaterThan(0);
 
     await act(async () => {
       triggerVisiblePage(renderer!, 2);
@@ -711,11 +813,15 @@ describe("PdfRenderer", () => {
       await waitFor(() =>
         collectPageSlots(renderer!.root).length === 1 ? true : null,
       );
+      await flush();
+      await waitFor(() => (lazyObservers.length > 0 ? true : null));
 
       await act(async () => {
         triggerLazyIntersection(renderer!, 1);
       });
-      await flush();
+      for (let i = 0; i < 5; i += 1) {
+        await flush();
+      }
       await waitFor(() => (TextLayerMock.mock.calls.length > 0 ? true : null));
 
       expect(wrapWordSpansMock).not.toHaveBeenCalled();
@@ -732,11 +838,15 @@ describe("PdfRenderer", () => {
       await waitFor(() =>
         collectPageSlots(renderer!.root).length === 1 ? true : null,
       );
+      await flush();
+      await waitFor(() => (lazyObservers.length > 0 ? true : null));
 
       await act(async () => {
         triggerLazyIntersection(renderer!, 1);
       });
-      await flush();
+      for (let i = 0; i < 5; i += 1) {
+        await flush();
+      }
       await waitFor(() => (wrapWordSpansMock.mock.calls.length > 0 ? true : null));
 
       expect(wrapWordSpansMock).toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import { parse as pagusParse, type Presentation } from "@pagus-kit/core";
 import { buildFontSubstitutes, renderSlide } from "@pagus-kit/renderer";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getPptxPageScrollTopFromSlideCache } from "../pptx/pptxPageScrollTop";
 import { namespaceSvgFragmentIds } from "../pptx/namespaceSvgFragmentIds";
 import { ViewerStatus } from "../primitives/ViewerStatus";
@@ -17,6 +17,7 @@ export interface PptxRendererProps {
   onError: (error: Error) => void;
   onPageCountChange: (pageCount: number) => void;
   onVisiblePageChange?: (page: number) => void;
+  onProgrammaticPageNavigateSettled?: (page: number) => void;
 }
 
 type SlideCacheEntry = {
@@ -43,6 +44,7 @@ export function PptxRenderer({
   onError,
   onPageCountChange,
   onVisiblePageChange,
+  onProgrammaticPageNavigateSettled,
 }: PptxRendererProps) {
   const presentationRef = useRef<Presentation | null>(null);
   const fontSubstitutesRef = useRef<Record<string, string>>({});
@@ -159,35 +161,36 @@ export function PptxRenderer({
     };
   }, [blob]);
 
-  const { scrollRef, notifyProgrammaticScroll } = usePaginatedScrollStack({
+  const getPageScrollTop = useCallback(
+    (targetPage: number) =>
+      getPptxPageScrollTopFromSlideCache(
+        targetPage,
+        slideCacheRef.current,
+        new Map(),
+        scale,
+        PAGE_GAP,
+      ),
+    [scale],
+  );
+
+  const { scrollRef } = usePaginatedScrollStack({
     numPages,
     isDocumentLoading,
     page,
     layoutKey: zoom,
     onVisiblePageChange,
     onPageNearViewport: renderSlideSlot,
+    getPageScrollTop,
+    onProgrammaticPageNavigateSettled,
   });
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (isDocumentLoading || numPages === 0) return;
-
     const clampedPage = Math.min(Math.max(page, 1), numPages);
     for (let pageNum = 1; pageNum <= clampedPage; pageNum += 1) {
       renderSlideSlot(pageNum);
     }
-
-    const container = scrollRef.current;
-    if (container == null) return;
-
-    container.scrollTop = getPptxPageScrollTopFromSlideCache(
-      clampedPage,
-      slideCacheRef.current,
-      new Map(),
-      scale,
-      PAGE_GAP,
-    );
-    notifyProgrammaticScroll();
-  }, [isDocumentLoading, notifyProgrammaticScroll, numPages, page, renderSlideSlot, scale]);
+  }, [isDocumentLoading, numPages, page, renderSlideSlot]);
 
   if (isDocumentLoading) {
     return (

@@ -18,7 +18,12 @@ import {
   zoomAfterImageClick,
 } from "./image/imageZoom";
 import { loadSourceToBlob } from "./source/loadSourceToBlob";
-import type { DetectionResult, FileViewerChromeApi, FileViewerProps } from "./types";
+import type {
+  DetectionResult,
+  FileViewerChromeApi,
+  FileViewerProps,
+  PageNavigateListener,
+} from "./types";
 
 type ViewerState =
   | { status: "loading" }
@@ -45,6 +50,25 @@ async function resolveViewerState(source: FileViewerProps["source"], signal: Abo
   return { blob, detection };
 }
 
+function createSubscribePageNavigate(listeners: Set<PageNavigateListener>) {
+  return (listener: PageNavigateListener) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+}
+
+function emitPageNavigateSettled(
+  listeners: Set<PageNavigateListener>,
+  page: number,
+) {
+  const event = { page, reason: "programmatic" as const };
+  listeners.forEach((listener) => {
+    listener(event);
+  });
+}
+
 function createChromeApi({
   detection,
   downloadUrl,
@@ -66,6 +90,9 @@ function createChromeApi({
   setImagePage,
   setPptxPage,
   setPptxZoom,
+  subscribePdfPageNavigate,
+  subscribeImagePageNavigate,
+  subscribePptxPageNavigate,
 }: {
   detection: DetectionResult;
   downloadUrl: string | null;
@@ -87,6 +114,9 @@ function createChromeApi({
   setImagePage: (page: number) => void;
   setPptxPage: (page: number) => void;
   setPptxZoom: (zoom: number) => void;
+  subscribePdfPageNavigate: (listener: PageNavigateListener) => () => void;
+  subscribeImagePageNavigate: (listener: PageNavigateListener) => () => void;
+  subscribePptxPageNavigate: (listener: PageNavigateListener) => () => void;
 }): FileViewerChromeApi {
   switch (detection.kind) {
     case "image":
@@ -110,6 +140,7 @@ function createChromeApi({
           prevPage: () => setImagePage(imagePage - 1),
           nextPage: () => setImagePage(imagePage + 1),
           setPage: (page) => setImagePage(page),
+          subscribePageNavigate: subscribeImagePageNavigate,
         },
       };
     case "pdf":
@@ -128,6 +159,7 @@ function createChromeApi({
           prevPage: () => setPdfPage(pdfPage - 1),
           nextPage: () => setPdfPage(pdfPage + 1),
           setPage: (page) => setPdfPage(page),
+          subscribePageNavigate: subscribePdfPageNavigate,
           zoomIn: () => setPdfZoom(pdfZoom + 10),
           zoomOut: () => setPdfZoom(pdfZoom - 10),
           setZoom: (zoom) => setPdfZoom(zoom),
@@ -173,6 +205,7 @@ function createChromeApi({
           prevPage: () => setPptxPage(pptxPage - 1),
           nextPage: () => setPptxPage(pptxPage + 1),
           setPage: (page) => setPptxPage(page),
+          subscribePageNavigate: subscribePptxPageNavigate,
           zoomIn: () => setPptxZoom(pptxZoom + 10),
           zoomOut: () => setPptxZoom(pptxZoom - 10),
           setZoom: (zoom) => setPptxZoom(zoom),
@@ -224,6 +257,21 @@ export function FileViewer({
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const pdfPageNavigateListenersRef = useRef(new Set<PageNavigateListener>());
+  const imagePageNavigateListenersRef = useRef(new Set<PageNavigateListener>());
+  const pptxPageNavigateListenersRef = useRef(new Set<PageNavigateListener>());
+  const subscribePdfPageNavigate = useMemo(
+    () => createSubscribePageNavigate(pdfPageNavigateListenersRef.current),
+    [],
+  );
+  const subscribeImagePageNavigate = useMemo(
+    () => createSubscribePageNavigate(imagePageNavigateListenersRef.current),
+    [],
+  );
+  const subscribePptxPageNavigate = useMemo(
+    () => createSubscribePageNavigate(pptxPageNavigateListenersRef.current),
+    [],
+  );
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -382,6 +430,9 @@ export function FileViewer({
       setImagePage: (page) => setImagePage(setPageWithinBounds(page, imagePageCount)),
       setPptxPage: (page) => setPptxPage(setPageWithinBounds(page, pptxPageCount)),
       setPptxZoom: (zoom) => setPptxZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
+      subscribePdfPageNavigate,
+      subscribeImagePageNavigate,
+      subscribePptxPageNavigate,
     });
   }, [
     activeSheetIndex,
@@ -398,6 +449,9 @@ export function FileViewer({
     pptxZoom,
     sheetNames,
     state,
+    subscribeImagePageNavigate,
+    subscribePdfPageNavigate,
+    subscribePptxPageNavigate,
   ]);
 
   const chromeContent = useMemo(() => {
@@ -422,6 +476,9 @@ export function FileViewer({
           onPageCountChange={setImagePageCount}
           onVisiblePageChange={(visiblePage) =>
             setImagePage(setPageWithinBounds(visiblePage, imagePageCount))
+          }
+          onProgrammaticPageNavigateSettled={(settledPage) =>
+            emitPageNavigateSettled(imagePageNavigateListenersRef.current, settledPage)
           }
         />
       )}
@@ -455,6 +512,9 @@ export function FileViewer({
           onVisiblePageChange={(visiblePage) =>
             setPdfPage(setPageWithinBounds(visiblePage, pdfPageCount))
           }
+          onProgrammaticPageNavigateSettled={(settledPage) =>
+            emitPageNavigateSettled(pdfPageNavigateListenersRef.current, settledPage)
+          }
         />
       )}
       {state.detection.kind === "docx" && <DocxRenderer blob={state.blob} onError={handleRenderError} />}
@@ -467,6 +527,9 @@ export function FileViewer({
           onPageCountChange={setPptxPageCount}
           onVisiblePageChange={(visiblePage) =>
             setPptxPage(setPageWithinBounds(visiblePage, pptxPageCount))
+          }
+          onProgrammaticPageNavigateSettled={(settledPage) =>
+            emitPageNavigateSettled(pptxPageNavigateListenersRef.current, settledPage)
           }
         />
       )}

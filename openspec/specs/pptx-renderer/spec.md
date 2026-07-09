@@ -145,7 +145,7 @@ When `renderSlide` fails for a specific slide, that slot SHALL show a localized 
 
 ### Requirement: Scroll drives visible page reporting
 
-`PptxRenderer` SHALL report the 1-based slide index with the highest intersection ratio in the viewport to the parent via `onVisiblePageChange` when the user scrolls, except during programmatic scroll-to-page guarded for `PROGRAMMATIC_SCROLL_GUARD_MS` (800ms).
+`PptxRenderer` SHALL report the 1-based slide index with the highest intersection ratio in the viewport to the parent via `onVisiblePageChange` when the user scrolls, except during programmatic scroll-to-page guarded until `scrollend` or `PROGRAMMATIC_SCROLL_GUARD_MS` (800ms). Programmatic `page` changes SHALL compute target `scrollTop` from slide geometry and smooth-scroll; they SHALL NOT skip scroll solely because a prior visible-page report came from user scroll.
 
 #### Scenario: Scrolling updates visible page
 
@@ -155,7 +155,7 @@ When `renderSlide` fails for a specific slide, that slot SHALL show a localized 
 #### Scenario: Programmatic page jump scrolls slot
 
 - **WHEN** the `page` prop changes to 3
-- **THEN** the renderer SHALL scroll slide 3's slot into view with `scrollIntoView`
+- **THEN** the renderer SHALL smooth-scroll so slide 3 aligns at the start of the viewport
 - **THEN** spurious `onVisiblePageChange` during the guard window SHALL be suppressed
 
 ### Requirement: Download uses original PPTX blob

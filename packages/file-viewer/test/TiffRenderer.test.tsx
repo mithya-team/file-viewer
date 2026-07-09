@@ -186,6 +186,10 @@ describe("TiffRenderer", () => {
             const className = props.className as string | undefined;
             if (className?.includes("bg-transparent")) {
               const scrollHost = {
+                scrollTop: 0,
+                scrollTo: vi.fn(),
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
                 getBoundingClientRect: () => ({
                   top: 0,
                   bottom: 200,

@@ -10,6 +10,8 @@ export type {
   FileViewerProps,
   FileViewerSource,
   ImageChromeApi,
+  PageNavigateEvent,
+  PageNavigateListener,
   PDFChromeApi,
   SpreadsheetChromeApi,
   PptxChromeApi,

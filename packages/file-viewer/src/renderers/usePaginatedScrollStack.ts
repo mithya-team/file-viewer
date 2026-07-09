@@ -4,6 +4,7 @@ import {
   OBSERVER_MARGIN,
   PROGRAMMATIC_SCROLL_GUARD_MS,
 } from "./pdf/constants";
+import { isScrollOffsetNear } from "./pageScrollTop";
 
 export type UsePaginatedScrollStackOptions = {
   numPages: number;
@@ -11,7 +12,11 @@ export type UsePaginatedScrollStackOptions = {
   page: number;
   onVisiblePageChange?: (page: number) => void;
   onPageNearViewport: (pageNum: number) => void;
+  /** Return target scrollTop for `page`, or null if geometry is not ready yet. */
+  getPageScrollTop: (page: number) => number | null;
+  onProgrammaticPageNavigateSettled?: (page: number) => void;
   layoutKey?: number | string;
+  scrollBehavior?: ScrollBehavior;
 };
 
 export type UsePaginatedScrollStackResult = {
@@ -39,31 +44,118 @@ export function usePaginatedScrollStack({
   page,
   onVisiblePageChange,
   onPageNearViewport,
+  getPageScrollTop,
+  onProgrammaticPageNavigateSettled,
   layoutKey,
+  scrollBehavior = "smooth",
 }: UsePaginatedScrollStackOptions): UsePaginatedScrollStackResult {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const suppressVisiblePageRef = useRef(false);
   const programmaticScrollRef = useRef(false);
   const layoutSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const programmaticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navGenerationRef = useRef(0);
+  const geometryRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipSettleOnceRef = useRef(true);
+  const lastLayoutKeyRef = useRef<number | string | undefined>(layoutKey);
+  const hasBoundObserversRef = useRef(false);
 
   const onVisiblePageChangeRef = useRef(onVisiblePageChange);
   const onPageNearViewportRef = useRef(onPageNearViewport);
+  const getPageScrollTopRef = useRef(getPageScrollTop);
+  const onSettledRef = useRef(onProgrammaticPageNavigateSettled);
   const pageRef = useRef(page);
+  const scrollBehaviorRef = useRef(scrollBehavior);
   onVisiblePageChangeRef.current = onVisiblePageChange;
   onPageNearViewportRef.current = onPageNearViewport;
+  getPageScrollTopRef.current = getPageScrollTop;
+  onSettledRef.current = onProgrammaticPageNavigateSettled;
   pageRef.current = page;
+  scrollBehaviorRef.current = scrollBehavior;
+
+  const clearProgrammaticGuardTimer = useCallback(() => {
+    if (programmaticTimerRef.current != null) {
+      clearTimeout(programmaticTimerRef.current);
+      programmaticTimerRef.current = null;
+    }
+  }, []);
+
+  const endProgrammaticScroll = useCallback(() => {
+    programmaticScrollRef.current = false;
+    clearProgrammaticGuardTimer();
+  }, [clearProgrammaticGuardTimer]);
 
   const notifyProgrammaticScroll = useCallback(() => {
     programmaticScrollRef.current = true;
-    if (programmaticTimerRef.current != null) {
-      clearTimeout(programmaticTimerRef.current);
-    }
+    clearProgrammaticGuardTimer();
     programmaticTimerRef.current = setTimeout(() => {
       programmaticScrollRef.current = false;
       programmaticTimerRef.current = null;
     }, PROGRAMMATIC_SCROLL_GUARD_MS);
-  }, []);
+  }, [clearProgrammaticGuardTimer]);
+
+  const settleNavigation = useCallback((
+    generation: number,
+    targetPage: number,
+    emitSettle: boolean,
+  ) => {
+    if (generation !== navGenerationRef.current) return;
+    endProgrammaticScroll();
+    if (emitSettle) onSettledRef.current?.(targetPage);
+  }, [endProgrammaticScroll]);
+
+  const runProgrammaticScroll = useCallback((
+    targetPage: number,
+    generation: number,
+    emitSettle: boolean,
+  ) => {
+    const container = scrollRef.current;
+    if (container == null) return;
+
+    const targetTop = getPageScrollTopRef.current(targetPage);
+    if (targetTop == null) {
+      if (geometryRetryTimerRef.current != null) {
+        clearTimeout(geometryRetryTimerRef.current);
+      }
+      geometryRetryTimerRef.current = setTimeout(() => {
+        geometryRetryTimerRef.current = null;
+        if (generation !== navGenerationRef.current) return;
+        runProgrammaticScroll(targetPage, generation, emitSettle);
+      }, 50);
+      return;
+    }
+
+    if (isScrollOffsetNear(container.scrollTop, targetTop)) {
+      settleNavigation(generation, targetPage, emitSettle);
+      return;
+    }
+
+    notifyProgrammaticScroll();
+
+    const onScrollEnd = () => {
+      if (typeof container.removeEventListener === "function") {
+        container.removeEventListener("scrollend", onScrollEnd);
+      }
+      settleNavigation(generation, targetPage, emitSettle);
+    };
+
+    if (typeof container.addEventListener === "function") {
+      container.addEventListener("scrollend", onScrollEnd);
+    }
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: targetTop, behavior: scrollBehaviorRef.current });
+    } else {
+      container.scrollTop = targetTop;
+    }
+
+    clearProgrammaticGuardTimer();
+    programmaticTimerRef.current = setTimeout(() => {
+      if (typeof container.removeEventListener === "function") {
+        container.removeEventListener("scrollend", onScrollEnd);
+      }
+      settleNavigation(generation, targetPage, emitSettle);
+    }, PROGRAMMATIC_SCROLL_GUARD_MS);
+  }, [clearProgrammaticGuardTimer, notifyProgrammaticScroll, settleNavigation]);
 
   useEffect(() => {
     if (isDocumentLoading || numPages === 0) return;
@@ -71,16 +163,23 @@ export function usePaginatedScrollStack({
     const container = scrollRef.current;
     if (container == null) return;
 
-    suppressVisiblePageRef.current = true;
-    notifyProgrammaticScroll();
+    const layoutKeyChanged =
+      hasBoundObserversRef.current && lastLayoutKeyRef.current !== layoutKey;
+    lastLayoutKeyRef.current = layoutKey;
+    hasBoundObserversRef.current = true;
 
-    if (layoutSettleTimerRef.current != null) {
-      clearTimeout(layoutSettleTimerRef.current);
+    if (layoutKeyChanged) {
+      suppressVisiblePageRef.current = true;
+      notifyProgrammaticScroll();
+
+      if (layoutSettleTimerRef.current != null) {
+        clearTimeout(layoutSettleTimerRef.current);
+      }
+      layoutSettleTimerRef.current = setTimeout(() => {
+        suppressVisiblePageRef.current = false;
+        layoutSettleTimerRef.current = null;
+      }, PROGRAMMATIC_SCROLL_GUARD_MS);
     }
-    layoutSettleTimerRef.current = setTimeout(() => {
-      suppressVisiblePageRef.current = false;
-      layoutSettleTimerRef.current = null;
-    }, PROGRAMMATIC_SCROLL_GUARD_MS);
 
     const lazyObserver = new IntersectionObserver(
       (entries) => {
@@ -148,6 +247,41 @@ export function usePaginatedScrollStack({
   }, [isDocumentLoading, layoutKey, notifyProgrammaticScroll, numPages]);
 
   useEffect(() => {
+    if (numPages === 0) {
+      skipSettleOnceRef.current = true;
+    }
+  }, [numPages]);
+
+  useEffect(() => {
+    if (isDocumentLoading || numPages === 0) return;
+    const clamped = Math.min(Math.max(page, 1), numPages);
+    const generation = ++navGenerationRef.current;
+    const emitSettle = !skipSettleOnceRef.current;
+    skipSettleOnceRef.current = false;
+    if (geometryRetryTimerRef.current != null) {
+      clearTimeout(geometryRetryTimerRef.current);
+      geometryRetryTimerRef.current = null;
+    }
+    runProgrammaticScroll(clamped, generation, emitSettle);
+  }, [isDocumentLoading, numPages, page, runProgrammaticScroll]);
+
+  useEffect(() => {
+    if (isDocumentLoading || numPages === 0) return;
+    if (layoutKey === undefined) return;
+    const container = scrollRef.current;
+    if (container == null) return;
+    const clamped = Math.min(Math.max(pageRef.current, 1), numPages);
+    const targetTop = getPageScrollTopRef.current(clamped);
+    if (targetTop == null || isScrollOffsetNear(container.scrollTop, targetTop)) return;
+    notifyProgrammaticScroll();
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top: targetTop, behavior: "auto" });
+    } else {
+      container.scrollTop = targetTop;
+    }
+  }, [isDocumentLoading, layoutKey, notifyProgrammaticScroll, numPages]);
+
+  useEffect(() => {
     return () => {
       if (layoutSettleTimerRef.current != null) {
         clearTimeout(layoutSettleTimerRef.current);
@@ -155,6 +289,10 @@ export function usePaginatedScrollStack({
       if (programmaticTimerRef.current != null) {
         clearTimeout(programmaticTimerRef.current);
       }
+      if (geometryRetryTimerRef.current != null) {
+        clearTimeout(geometryRetryTimerRef.current);
+      }
+      navGenerationRef.current += 1;
     };
   }, []);
 

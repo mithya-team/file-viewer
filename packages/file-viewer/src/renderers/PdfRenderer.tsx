@@ -3,6 +3,7 @@ import {
   GlobalWorkerOptions,
   getDocument,
   TextLayer,
+  type PageViewport,
   type PDFDocumentProxy,
 } from "pdfjs-dist";
 import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
@@ -11,7 +12,6 @@ import {
   FILE_VIEWER_SEARCH_DEBOUNCE_MS,
   OBSERVER_MARGIN,
   PAGE_GAP,
-  PROGRAMMATIC_SCROLL_GUARD_MS,
 } from "./pdf/constants";
 import {
   applyHighlightsForPage,
@@ -23,6 +23,7 @@ import { PDF_SEARCH_HIT_CLASS } from "./pdf/searchHighlightColors";
 import { scanPdfMatches } from "./pdf/pdfSearchScan";
 import type { PdfSearchMatch, PdfSearchState } from "./pdf/pdfSearchTypes";
 import { PDF_WORD_SEG_CLASS, wrapPdfTextLayerRunsWithWordSpans } from "./pdf/pdfTextLayerWordSpans";
+import { getPageScrollTopFromSizes } from "./pageScrollTop";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./rendererViewport";
 import {
   PDF_CANVAS_CLASS,
@@ -31,6 +32,7 @@ import {
   PDF_SCROLL_ROOT_CLASS,
   TEXT_LAYER_CONTAINER_CLASS,
 } from "./pdf/textLayerTailwind";
+import { usePaginatedScrollStack } from "./usePaginatedScrollStack";
 
 export interface PdfRendererProps {
   blob: Blob;
@@ -40,6 +42,7 @@ export interface PdfRendererProps {
   onError: (error: Error) => void;
   onPageCountChange: (pageCount: number) => void;
   onVisiblePageChange?: (page: number) => void;
+  onProgrammaticPageNavigateSettled?: (page: number) => void;
   searchQuery?: string;
   activeMatchIndex?: number;
   onSearchStateChange?: (state: PdfSearchState) => void;
@@ -85,12 +88,12 @@ export function PdfRenderer({
   onError,
   onPageCountChange,
   onVisiblePageChange,
+  onProgrammaticPageNavigateSettled,
   searchQuery = "",
   activeMatchIndex = 0,
   onSearchStateChange,
   onRequestPageForSearch,
 }: PdfRendererProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const textLayerContainerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -102,21 +105,14 @@ export function PdfRenderer({
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderingRef = useRef<Set<number>>(new Set());
   const renderedScaleRef = useRef<Map<number, number>>(new Map());
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const visibleObserverRef = useRef<IntersectionObserver | null>(null);
-  const pageFromScrollRef = useRef(false);
-  const programmaticScrollRef = useRef(false);
-  const programmaticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
-  const onVisiblePageChangeRef = useRef(onVisiblePageChange);
   const onSearchStateChangeRef = useRef(onSearchStateChange);
   const onRequestPageForSearchRef = useRef(onRequestPageForSearch);
 
   onErrorRef.current = onError;
   onPageCountChangeRef.current = onPageCountChange;
-  onVisiblePageChangeRef.current = onVisiblePageChange;
   onSearchStateChangeRef.current = onSearchStateChange;
   onRequestPageForSearchRef.current = onRequestPageForSearch;
 
@@ -126,6 +122,7 @@ export function PdfRenderer({
     () => new Map(),
   );
   const [searchMatches, setSearchMatches] = useState<PdfSearchMatch[]>([]);
+  const renderPageRef = useRef<((pageNum: number) => void) | null>(null);
 
   searchMatchesRef.current = searchMatches;
   activeMatchIdxRef.current = activeMatchIndex;
@@ -134,6 +131,25 @@ export function PdfRenderer({
   const searchActive = searchQuery.trim().length > 0;
 
   const getEffectiveScale = useCallback(() => zoom / 100, [zoom]);
+
+  const getPageScrollTop = useCallback(
+    (targetPage: number) =>
+      getPageScrollTopFromSizes(targetPage, pageSizes, getEffectiveScale(), PAGE_GAP),
+    [getEffectiveScale, pageSizes],
+  );
+
+  const { scrollRef } = usePaginatedScrollStack({
+    numPages,
+    isDocumentLoading,
+    page,
+    layoutKey: zoom,
+    onVisiblePageChange,
+    onPageNearViewport: (pageNum) => {
+      renderPageRef.current?.(pageNum);
+    },
+    getPageScrollTop,
+    onProgrammaticPageNavigateSettled,
+  });
 
   const reapplyAllHighlights = useCallback(() => {
     if (!searchActive) return;
@@ -150,9 +166,13 @@ export function PdfRenderer({
   }, [searchActive]);
 
   const renderTextLayerForPage = useCallback(
-    async (pageNum: number, pdfPage: Awaited<ReturnType<PDFDocumentProxy["getPage"]>>, viewport: ReturnType<typeof pdfPage.getViewport>) => {
+    async (
+      pageNum: number,
+      pdfPage: Awaited<ReturnType<PDFDocumentProxy["getPage"]>>,
+      viewport: PageViewport,
+    ): Promise<boolean> => {
       const container = textLayerContainerRefs.current.get(pageNum);
-      if (!container) return;
+      if (!container) return false;
 
       const scale = getEffectiveScale();
       const prev = textLayerByPageRef.current.get(pageNum);
@@ -165,7 +185,7 @@ export function PdfRenderer({
       try {
         textContent = await pdfPage.getTextContent();
       } catch {
-        return;
+        return false;
       }
 
       const textLayer = new TextLayer({
@@ -177,7 +197,7 @@ export function PdfRenderer({
       try {
         await textLayer.render();
       } catch {
-        return;
+        return false;
       }
 
       if (searchActive) {
@@ -193,6 +213,7 @@ export function PdfRenderer({
           activeMatchIdxRef.current,
         );
       }
+      return true;
     },
     [getEffectiveScale, searchActive],
   );
@@ -226,10 +247,12 @@ export function PdfRenderer({
           }
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-          return pdfPage.render({ canvasContext: ctx, viewport }).promise.then(() => {
-            renderedScaleRef.current.set(pageNum, scale);
+          return pdfPage.render({ canvasContext: ctx, viewport }).promise.then(async () => {
+            const textLayerReady = await renderTextLayerForPage(pageNum, pdfPage, viewport);
+            if (textLayerReady) {
+              renderedScaleRef.current.set(pageNum, scale);
+            }
             renderingRef.current.delete(pageNum);
-            return renderTextLayerForPage(pageNum, pdfPage, viewport);
           });
         })
         .catch((error) => {
@@ -239,6 +262,8 @@ export function PdfRenderer({
     },
     [getEffectiveScale, renderTextLayerForPage],
   );
+
+  renderPageRef.current = renderPage;
 
   const renderVisiblePages = useCallback(() => {
     const container = scrollRef.current;
@@ -323,98 +348,7 @@ export function PdfRenderer({
       renderVisiblePages();
     });
     return () => cancelAnimationFrame(id);
-  }, [isDocumentLoading, numPages, zoom, renderVisiblePages]);
-
-  useEffect(() => {
-    if (numPages === 0 || isDocumentLoading) return;
-
-    const container = scrollRef.current;
-    if (!container) return;
-
-    observerRef.current?.disconnect();
-    visibleObserverRef.current?.disconnect();
-
-    const lazyObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const pageNum = Number((entry.target as HTMLElement).dataset.pageNum);
-            if (pageNum) renderPage(pageNum);
-          }
-        });
-      },
-      { root: container, rootMargin: `${OBSERVER_MARGIN}px 0px` },
-    );
-
-    const visiblePages = new Map<number, number>();
-    const visibleObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const pageNum = Number((entry.target as HTMLElement).dataset.pageNum);
-          if (!pageNum) return;
-          if (entry.isIntersecting) {
-            visiblePages.set(pageNum, entry.intersectionRatio);
-          } else {
-            visiblePages.delete(pageNum);
-          }
-        });
-        if (visiblePages.size > 0) {
-          let best = 0;
-          let bestRatio = 0;
-          visiblePages.forEach((ratio, p) => {
-            if (ratio > bestRatio) {
-              bestRatio = ratio;
-              best = p;
-            }
-          });
-          if (best > 0 && !programmaticScrollRef.current) {
-            pageFromScrollRef.current = true;
-            onVisiblePageChangeRef.current?.(best);
-          }
-        }
-      },
-      { root: container, threshold: [0, 0.25, 0.5, 0.75, 1] },
-    );
-
-    observerRef.current = lazyObserver;
-    visibleObserverRef.current = visibleObserver;
-
-    const wrappers = container.querySelectorAll<HTMLElement>("[data-page-num]");
-    wrappers.forEach((el) => {
-      lazyObserver.observe(el);
-      visibleObserver.observe(el);
-    });
-
-    return () => {
-      lazyObserver.disconnect();
-      visibleObserver.disconnect();
-    };
-  }, [numPages, isDocumentLoading, renderPage, zoom]);
-
-  useEffect(() => {
-    if (pageFromScrollRef.current) {
-      pageFromScrollRef.current = false;
-      return;
-    }
-    if (numPages === 0 || isDocumentLoading) return;
-    const container = scrollRef.current;
-    if (!container) return;
-    const clamped = Math.min(Math.max(page, 1), numPages);
-    const target = container.querySelector<HTMLElement>(
-      `[data-page-num="${clamped}"]`,
-    );
-    if (!target) return;
-
-    programmaticScrollRef.current = true;
-    if (programmaticTimerRef.current) {
-      clearTimeout(programmaticTimerRef.current);
-    }
-    programmaticTimerRef.current = setTimeout(() => {
-      programmaticScrollRef.current = false;
-    }, PROGRAMMATIC_SCROLL_GUARD_MS);
-
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [page, numPages, isDocumentLoading]);
+  }, [isDocumentLoading, numPages, pageSizes, zoom, renderVisiblePages]);
 
   useEffect(() => {
     reapplyAllHighlights();

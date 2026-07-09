@@ -38,6 +38,8 @@ const requiredPublicTypes = [
   "FileKind",
   "DetectionResult",
   "ImageChromeApi",
+  "PageNavigateEvent",
+  "PageNavigateListener",
   "PDFChromeApi",
   "SpreadsheetChromeApi",
   "DocxChromeApi",

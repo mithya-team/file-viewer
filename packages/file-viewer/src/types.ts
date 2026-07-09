@@ -23,11 +23,19 @@ export interface FileViewerErrorContext {
   sourceType: "string" | "blob" | "stream";
 }
 
+export type PageNavigateEvent = {
+  page: number;
+  reason: "programmatic";
+};
+
+export type PageNavigateListener = (event: PageNavigateEvent) => void;
+
 type ChromeFileBase<K extends FileKind> = {
   kind: K;
   mimeType: string;
   downloadUrl: string | null;
 };
+
 export type ImageChromeApi = {
   file: ChromeFileBase<"image">;
   image: {
@@ -44,8 +52,10 @@ export type ImageChromeApi = {
     prevPage: () => void;
     nextPage: () => void;
     setPage: (page: number) => void;
+    subscribePageNavigate: (listener: PageNavigateListener) => () => void;
   };
 };
+
 export type PDFChromeApi = {
   file: ChromeFileBase<"pdf">;
   pdf: {
@@ -57,11 +67,13 @@ export type PDFChromeApi = {
     prevPage: () => void;
     nextPage: () => void;
     setPage: (page: number) => void;
+    subscribePageNavigate: (listener: PageNavigateListener) => () => void;
     zoomIn: () => void;
     zoomOut: () => void;
     setZoom: (zoom: number) => void;
   };
 };
+
 export type SpreadsheetChromeApi = {
   file: ChromeFileBase<"spreadsheet">;
   spreadsheet: {
@@ -70,9 +82,11 @@ export type SpreadsheetChromeApi = {
     setActiveSheetIndex?: (index: number) => void;
   };
 };
+
 export type DocxChromeApi = {
   file: ChromeFileBase<"docx">;
 };
+
 export type PptxChromeApi = {
   file: ChromeFileBase<"pptx">;
   pptx: {
@@ -84,17 +98,21 @@ export type PptxChromeApi = {
     prevPage: () => void;
     nextPage: () => void;
     setPage: (page: number) => void;
+    subscribePageNavigate: (listener: PageNavigateListener) => () => void;
     zoomIn: () => void;
     zoomOut: () => void;
     setZoom: (zoom: number) => void;
   };
 };
+
 export type TextChromeApi = {
-      file: ChromeFileBase<"text">;
-    }
+  file: ChromeFileBase<"text">;
+};
+
 export type UnsupportedChromeApi = {
-      file: ChromeFileBase<"unsupported">;
-    };
+  file: ChromeFileBase<"unsupported">;
+};
+
 export type FileViewerChromeApi =
   | ImageChromeApi
   | PDFChromeApi
@@ -102,7 +120,7 @@ export type FileViewerChromeApi =
   | DocxChromeApi
   | PptxChromeApi
   | TextChromeApi
-  | UnsupportedChromeApi
+  | UnsupportedChromeApi;
 
 export type FileViewerChrome =
   | "default"

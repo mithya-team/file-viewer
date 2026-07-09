@@ -37,27 +37,22 @@ The hook SHALL track intersection ratios for visible slots and call `onVisiblePa
 
 ### Requirement: Programmatic scroll guard
 
-When the `page` prop changes, the hook SHALL scroll the matching `[data-page-num]` slot into view with `scrollIntoView({ behavior: "smooth", block: "start" })` and SHALL set a guard that suppresses `onVisiblePageChange` for `PROGRAMMATIC_SCROLL_GUARD_MS` (800ms).
+When the `page` prop changes to a target whose scroll offset differs from the current `scrollTop` by more than a small epsilon, the stack SHALL compute the target offset from known page/slot geometry and scroll with `behavior: "smooth"` (via `scrollTo` or equivalent). It SHALL suppress `onVisiblePageChange` until `scrollend` on the scroll root, or until `PROGRAMMATIC_SCROLL_GUARD_MS` (800ms) elapses if `scrollend` is unavailable. When the offset is already within epsilon, the stack SHALL NOT start a new scroll animation.
 
 #### Scenario: Chrome page input scrolls slot
 
-- **WHEN** `page` changes from 1 to 4
-- **THEN** the hook SHALL scroll the slot with `data-page-num="4"` into view
+- **WHEN** `page` changes from 1 to 4 and geometry for intervening pages is known
+- **THEN** the scroll root SHALL smooth-scroll so page 4 aligns at the start of the viewport
 
 #### Scenario: Guard suppresses echo callback
 
-- **WHEN** `page` was set programmatically and scroll animation is in progress
-- **THEN** `onVisiblePageChange` SHALL NOT fire until the guard elapses
+- **WHEN** `page` was set programmatically and smooth scroll is in progress
+- **THEN** `onVisiblePageChange` SHALL NOT fire until the guard clears
 
-### Requirement: Scroll-driven page echo suppression
+#### Scenario: Echo page prop does not re-animate
 
-When `onVisiblePageChange` fires from user scroll, the hook SHALL set an internal flag so the next `page` prop echo does not trigger a redundant `scrollIntoView`.
-
-#### Scenario: User scroll does not fight chrome
-
-- **WHEN** the user scrolls and `onVisiblePageChange` reports page 2
-- **AND** the parent updates `page` to 2
-- **THEN** the hook SHALL NOT call `scrollIntoView` for that echo update
+- **WHEN** user scroll reports page 2 and the parent sets `page` to 2 while already at that offset
+- **THEN** the stack SHALL NOT start a new smooth scroll
 
 ### Requirement: layoutKey rebinds observers
 

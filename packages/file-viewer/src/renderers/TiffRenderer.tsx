@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DEFAULT_IMAGE_ZOOM } from "../image/imageZoom";
-import { decodeTiffIfdCount, decodeTiffPageToPngBlob } from "../image/tiffDecode";
+import { decodeTiffPageToPngBlob } from "../image/tiffDecode";
 import type { UtifIfd } from "../image/utif";
 import UTIF from "../vendor/UTIF.js";
 import { ViewerStatus } from "../primitives/ViewerStatus";
-import {
-  OBSERVER_MARGIN,
-  PAGE_GAP,
-  PROGRAMMATIC_SCROLL_GUARD_MS,
-} from "./pdf/constants";
+import { PAGE_GAP } from "./pdf/constants";
 import { PDF_PAGE_COLUMN_CLASS, PDF_PAGE_SLOT_CLASS, PDF_SCROLL_ROOT_CLASS } from "./pdf/textLayerTailwind";
+import { getPageScrollTopFromSizes } from "./pageScrollTop";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./rendererViewport";
+import { usePaginatedScrollStack } from "./usePaginatedScrollStack";
 
 export interface TiffRendererProps {
   blob: Blob;
@@ -19,6 +17,7 @@ export interface TiffRendererProps {
   onError: (error: Error) => void;
   onPageCountChange: (pageCount: number) => void;
   onVisiblePageChange?: (page: number) => void;
+  onProgrammaticPageNavigateSettled?: (page: number) => void;
 }
 
 type PageSlotState =
@@ -55,24 +54,18 @@ export function TiffRenderer({
   onError,
   onPageCountChange,
   onVisiblePageChange,
+  onProgrammaticPageNavigateSettled,
 }: TiffRendererProps) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const bufferRef = useRef<ArrayBuffer | null>(null);
   const ifdsRef = useRef<UtifIfd[]>([]);
   const displayUrlsRef = useRef<Map<number, string>>(new Map());
   const decodingRef = useRef<Set<number>>(new Set());
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const visibleObserverRef = useRef<IntersectionObserver | null>(null);
-  const pageFromScrollRef = useRef(false);
-  const programmaticScrollRef = useRef(false);
-  const programmaticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const decodePageRef = useRef<(pageNum: number) => void>(() => {});
 
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
-  const onVisiblePageChangeRef = useRef(onVisiblePageChange);
   onErrorRef.current = onError;
   onPageCountChangeRef.current = onPageCountChange;
-  onVisiblePageChangeRef.current = onVisiblePageChange;
 
   const [numPages, setNumPages] = useState(0);
   const [pageSizes, setPageSizes] = useState<Map<number, { w: number; h: number }>>(new Map());
@@ -81,6 +74,25 @@ export function TiffRenderer({
 
   const isFitZoom = zoom <= DEFAULT_IMAGE_ZOOM;
   const scale = zoom / 100;
+
+  const getPageScrollTop = useCallback(
+    (targetPage: number) =>
+      getPageScrollTopFromSizes(targetPage, pageSizes, scale, PAGE_GAP, 96),
+    [pageSizes, scale],
+  );
+
+  const { scrollRef } = usePaginatedScrollStack({
+    numPages,
+    isDocumentLoading,
+    page,
+    layoutKey: zoom,
+    onVisiblePageChange,
+    onPageNearViewport: (pageNum) => {
+      void decodePageRef.current(pageNum);
+    },
+    getPageScrollTop,
+    onProgrammaticPageNavigateSettled,
+  });
 
   const decodePage = useCallback(
     async (pageNum: number) => {
@@ -127,6 +139,10 @@ export function TiffRenderer({
     },
     [],
   );
+
+  decodePageRef.current = (pageNum) => {
+    void decodePage(pageNum);
+  };
 
   useEffect(() => {
     let active = true;
@@ -176,94 +192,6 @@ export function TiffRenderer({
       decodingRef.current.clear();
     };
   }, [blob]);
-
-  useEffect(() => {
-    if (isDocumentLoading || numPages === 0) return;
-
-    const container = scrollRef.current;
-    if (container == null) return;
-
-    observerRef.current?.disconnect();
-    visibleObserverRef.current?.disconnect();
-
-    const lazyObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) return;
-          const pageNum = Number((entry.target as HTMLElement).dataset.pageNum);
-          if (pageNum > 0) void decodePage(pageNum);
-        });
-      },
-      { root: container, rootMargin: `${OBSERVER_MARGIN}px 0px` },
-    );
-
-    const visiblePages = new Map<number, number>();
-    const visibleObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const pageNum = Number((entry.target as HTMLElement).dataset.pageNum);
-          if (!pageNum) return;
-          if (entry.isIntersecting) {
-            visiblePages.set(pageNum, entry.intersectionRatio);
-          } else {
-            visiblePages.delete(pageNum);
-          }
-        });
-        if (visiblePages.size > 0) {
-          let best = 0;
-          let bestRatio = 0;
-          visiblePages.forEach((ratio, pageNumber) => {
-            if (ratio > bestRatio) {
-              bestRatio = ratio;
-              best = pageNumber;
-            }
-          });
-          if (best > 0 && !programmaticScrollRef.current) {
-            pageFromScrollRef.current = true;
-            onVisiblePageChangeRef.current?.(best);
-          }
-        }
-      },
-      { root: container, threshold: [0, 0.25, 0.5, 0.75, 1] },
-    );
-
-    observerRef.current = lazyObserver;
-    visibleObserverRef.current = visibleObserver;
-
-    const wrappers = container.querySelectorAll<HTMLElement>("[data-page-num]");
-    wrappers.forEach((element) => {
-      lazyObserver.observe(element);
-      visibleObserver.observe(element);
-    });
-
-    return () => {
-      lazyObserver.disconnect();
-      visibleObserver.disconnect();
-    };
-  }, [decodePage, isDocumentLoading, numPages]);
-
-  useEffect(() => {
-    if (pageFromScrollRef.current) {
-      pageFromScrollRef.current = false;
-      return;
-    }
-    if (numPages === 0 || isDocumentLoading) return;
-    const container = scrollRef.current;
-    if (container == null) return;
-    const clamped = Math.min(Math.max(page, 1), numPages);
-    const target = container.querySelector<HTMLElement>(`[data-page-num="${clamped}"]`);
-    if (target == null) return;
-
-    programmaticScrollRef.current = true;
-    if (programmaticTimerRef.current != null) {
-      clearTimeout(programmaticTimerRef.current);
-    }
-    programmaticTimerRef.current = setTimeout(() => {
-      programmaticScrollRef.current = false;
-    }, PROGRAMMATIC_SCROLL_GUARD_MS);
-
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [isDocumentLoading, numPages, page]);
 
   if (isDocumentLoading) {
     return (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { shouldReportVisiblePageChange } from "../src/renderers/usePaginatedScrollStack";
+import { isScrollOffsetNear } from "../src/renderers/pageScrollTop";
 
 describe("shouldReportVisiblePageChange", () => {
   it("ignores observer callbacks that report the current page", () => {
@@ -16,5 +17,11 @@ describe("shouldReportVisiblePageChange", () => {
 
   it("ignores callbacks while layout is settling after zoom", () => {
     expect(shouldReportVisiblePageChange(2, 1, false, true)).toBe(false);
+  });
+});
+
+describe("programmatic scroll echo", () => {
+  it("skips re-scroll when already at target offset", () => {
+    expect(isScrollOffsetNear(480, 481)).toBe(true);
   });
 });
