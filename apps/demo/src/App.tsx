@@ -18,6 +18,7 @@ import {
 const FILE_LABELS: Record<DemoFileType, string> = {
   text: "Text",
   markdown: "Markdown",
+  html: "HTML",
   csv: "CSV",
   image: "Image (JPEG)",
   tiffMulti: "TIFF (multi-page)",
@@ -33,6 +34,7 @@ const FILE_LABELS: Record<DemoFileType, string> = {
 const FILE_PATHS: Record<DemoFileType, string> = {
   text: "/sample-files/2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding%20Agreement_%20Agency%20Agreement.txt",
   markdown: "/sample-files/sample.md",
+  html: "/sample-files/sample.html",
   csv: "/sample-files/blank%20rfp%20-shortened.csv",
   image: "/sample-files/mountains.jpg",
   tiffMulti: "/sample-files/Multi_page24bpp.tif",
@@ -138,6 +140,16 @@ async function buildSource(
       const bytes = new Uint8Array(await response.arrayBuffer());
       return `data:text/markdown;base64,${await toBase64FromBytes(bytes)}`;
     }
+    if (fileType === "html") {
+      const response = await fetch(absoluteUrl);
+      if (!response.ok) {
+        throw new Error(
+          `Fixture fetch failed (${response.status}) for ${absoluteUrl}`,
+        );
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return `data:text/html;base64,${await toBase64FromBytes(bytes)}`;
+    }
     return absoluteUrl;
   }
 
@@ -152,6 +164,9 @@ async function buildSource(
     if (fileType === "markdown") {
       return new Blob([await response.arrayBuffer()], { type: "text/markdown" });
     }
+    if (fileType === "html") {
+      return new Blob([await response.arrayBuffer()], { type: "text/html" });
+    }
     return response.blob();
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
@@ -159,11 +174,17 @@ async function buildSource(
     if (fileType === "markdown") {
       return new Blob([bytes], { type: "text/markdown" });
     }
+    if (fileType === "html") {
+      return new Blob([bytes], { type: "text/html" });
+    }
     return createStreamFromBytes(bytes);
   }
 
   if (fileType === "markdown") {
     return new Blob([bytes], { type: "text/markdown" });
+  }
+  if (fileType === "html") {
+    return new Blob([bytes], { type: "text/html" });
   }
   return toBase64FromBytes(bytes);
 }
@@ -315,6 +336,7 @@ export default function App() {
                 className="absolute inset-0 min-h-0"
                 source={resolvedSource}
                 chrome={chromeMode === "custom" ? customChrome : chromeMode}
+                enableHtmlPreview={fileType === "html"}
                 onError={(nextError, context) => {
                   setViewerEvent(`${context.stage}: ${nextError.message}`);
                 }}

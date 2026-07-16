@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sample HTML</title>
+    <style>
+      body {
+        font-family: Georgia, serif;
+        margin: 2rem;
+        color: #1e293b;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sample HTML preview</h1>
+    <p>This fixture exercises the opt-in sandboxed iframe path.</p>
+    <button type="button" id="ping">Ping</button>
+    <p id="out"></p>
+    <script>
+      document.getElementById("ping").addEventListener("click", function () {
+        document.getElementById("out").textContent = "Script ran inside sandbox.";
+      });
+    </script>
+  </body>
+</html>

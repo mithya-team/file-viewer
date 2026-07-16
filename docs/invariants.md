@@ -35,9 +35,10 @@ This file details what not to do when building this library/package.
 
 ## Format Scope
 
-- Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, `pptx`, `potx`, text files, and markdown (`text/markdown`, `text/x-markdown`).
-- Must treat `txt`, `csv`, and markdown support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic or extension routing.
+- Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, `pptx`, `potx`, text files, markdown (`text/markdown`, `text/x-markdown`), and HTML (`text/html`).
+- Must treat `txt`, `csv`, markdown, and HTML support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic or extension routing.
 - Must render markdown through an internal `MarkdownRenderer` with GFM + sanitization (static preview only).
+- Must detect `text/html` as `html` kind; HTML iframe preview MUST be opt-in via `enableHtmlPreview` (default false). When disabled, HTML MUST fall back to the text renderer. When enabled, MUST use a sandboxed iframe with `allow-scripts` and without `allow-same-origin`. MUST NOT treat `application/xhtml+xml` as HTML in v1.
 - Must render `dotx` through the DOCX path only.
 - Must render `potx` through the PPTX path only.
 - Must not execute template behavior, embedded actions, macros, scripts, or external document side effects.
@@ -118,6 +119,6 @@ This file details what not to do when building this library/package.
 
 - Must treat remote fetch failures as user-visible errors.
 - Must not leak fetched file contents to logs.
-- Must not execute scripts from loaded documents.
+- Must not execute scripts from loaded documents by default. HTML preview scripts MAY run only inside a sandboxed iframe when the consumer sets `enableHtmlPreview`, and that sandbox MUST NOT include `allow-same-origin`.
 - Must not inject loaded text or document HTML with unsafe `innerHTML` unless sanitized or produced by a trusted renderer library with understood limits.
-- Must not fetch external document subresources unless the renderer library requires it and the behavior is documented.
+- Must not fetch external document subresources unless the renderer library requires it and the behavior is documented. HTML preview (when enabled) MAY load remote subresources from the document; this MUST be documented.

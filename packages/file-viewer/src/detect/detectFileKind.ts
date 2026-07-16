@@ -61,6 +61,7 @@ const TEXTUAL_MIME = new Set([
   "application/javascript",
 ]);
 const MARKDOWN_MIME = new Set(["text/markdown", "text/x-markdown"]);
+const HTML_MIME = "text/html";
 const DOCX_MIME = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
@@ -144,9 +145,13 @@ export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
   if (MARKDOWN_MIME.has(normalizedMime) && isProbablyText(sampleBytes)) {
     return { kind: "markdown", mimeType: normalizedMime };
   }
+  if (normalizedMime === HTML_MIME && isProbablyText(sampleBytes)) {
+    return { kind: "html", mimeType: normalizedMime };
+  }
   if (
     (TEXTUAL_MIME.has(normalizedMime) || normalizedMime.startsWith("text/"))
     && !MARKDOWN_MIME.has(normalizedMime)
+    && normalizedMime !== HTML_MIME
     && isProbablyText(sampleBytes)
   ) {
     return { kind: "text", mimeType: normalizedMime };

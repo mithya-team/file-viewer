@@ -29,6 +29,7 @@
 - `TextChromeApi`
 - `PptxChromeApi`
 - `MarkdownChromeApi`
+- `HtmlChromeApi`
 - `UnsupportedChromeApi`
 - `PageNavigateEvent`
 - `PageNavigateListener`
@@ -46,6 +47,7 @@
 - `TextRendererProps`
 - `PptxRendererProps`
 - `MarkdownRendererProps`
+- `HtmlRendererProps`
 
 **PDF search**
 
@@ -78,6 +80,17 @@
 
 - **WHEN** a consumer writes `import type { MarkdownChromeApi } from "@file-viewer/react"`
 - **THEN** TypeScript SHALL resolve the type from the package entry
+
+#### Scenario: Consumer imports HtmlChromeApi from package entry
+
+- **WHEN** a consumer writes `import type { HtmlChromeApi } from "@file-viewer/react"`
+- **THEN** TypeScript SHALL resolve the type from the package entry
+
+#### Scenario: Consumer imports HtmlRendererProps from package entry
+
+- **WHEN** a consumer writes `import type { HtmlRendererProps } from "@file-viewer/react"`
+- **THEN** TypeScript SHALL resolve the type from the package entry
+- **AND** `HtmlRenderer` SHALL NOT be a public runtime export
 
 ### Requirement: Internal implementation types stay off the public entry
 
@@ -201,3 +214,40 @@ alongside existing `objectUrl` and `onError` fields.
 
 - **WHEN** a consumer switches on `DetectionResult["kind"]`
 - **THEN** TypeScript SHALL require handling `"markdown"` for exhaustiveness
+
+### Requirement: Package entry exports HtmlChromeApi
+
+`@file-viewer/react` SHALL re-export type `HtmlChromeApi` from its primary entrypoint using a type-only export so it appears in `dist/index.d.ts`.
+
+#### Scenario: Consumer imports HtmlChromeApi from package entry
+
+- **WHEN** a consumer writes `import type { HtmlChromeApi } from "@file-viewer/react"`
+- **THEN** TypeScript SHALL resolve the type from the package entry
+
+### Requirement: Package entry exports HtmlRendererProps
+
+`@file-viewer/react` SHALL re-export type `HtmlRendererProps` from its primary entrypoint using a type-only export. The `HtmlRenderer` component MUST NOT be a public runtime export.
+
+#### Scenario: Consumer imports HtmlRendererProps without the component
+
+- **WHEN** a consumer writes `import type { HtmlRendererProps } from "@file-viewer/react"`
+- **THEN** TypeScript SHALL resolve the type
+- **AND** importing `HtmlRenderer` from `@file-viewer/react` SHALL NOT be part of the public API
+
+### Requirement: FileKind and DetectionResult include html
+
+`FileKind` and `DetectionResult` SHALL include the `"html"` variant so consumers typing detection or chrome switches can handle HTML.
+
+#### Scenario: Consumer narrows on html kind
+
+- **WHEN** a consumer writes a type guard or switch on `DetectionResult` / `FileKind` including `"html"`
+- **THEN** TypeScript SHALL accept `"html"` as a valid kind discriminant
+
+### Requirement: FileViewerProps includes enableHtmlPreview
+
+`FileViewerProps` SHALL include optional `enableHtmlPreview?: boolean` (documented default `false`) on the public props type exported from the package entry.
+
+#### Scenario: Consumer types enableHtmlPreview
+
+- **WHEN** a consumer writes `<FileViewer source={src} enableHtmlPreview />` with types from `@file-viewer/react`
+- **THEN** TypeScript SHALL accept `enableHtmlPreview` on `FileViewerProps`

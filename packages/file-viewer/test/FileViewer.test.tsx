@@ -119,6 +119,10 @@ vi.mock("../src/renderers/MarkdownRenderer", () => ({
   MarkdownRenderer: () => <div data-renderer="markdown">Markdown renderer</div>,
 }));
 
+vi.mock("../src/renderers/HtmlRenderer", () => ({
+  HtmlRenderer: () => <div data-renderer="html">HTML renderer</div>,
+}));
+
 vi.mock("../src/renderers/DocxRenderer", () => ({
   DocxRenderer: () => <div data-renderer="docx">Docx renderer</div>,
 }));
@@ -858,6 +862,44 @@ describe("FileViewer", () => {
     );
     expect(markdown).not.toBeNull();
     expect(findAllByText(renderer, "MARKDOWN").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Prev")).toHaveLength(0);
+  });
+
+  it("defaults html to text fallback without iframe", async () => {
+    mockResolvedSource({
+      kind: "html",
+      mimeType: "text/html",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome="default" />);
+    });
+
+    const text = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "text" })[0] ?? null,
+    );
+    expect(text).not.toBeNull();
+    expect(renderer?.root.findAllByProps({ "data-renderer": "html" })).toHaveLength(0);
+    expect(findAllByText(renderer, "HTML").length).toBeGreaterThan(0);
+  });
+
+  it("routes html to HtmlRenderer when enableHtmlPreview is true", async () => {
+    mockResolvedSource({
+      kind: "html",
+      mimeType: "text/html",
+    });
+
+    await act(async () => {
+      renderer = create(
+        <FileViewer source="fixture" chrome="default" enableHtmlPreview />,
+      );
+    });
+
+    const html = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "html" })[0] ?? null,
+    );
+    expect(html).not.toBeNull();
+    expect(renderer?.root.findAllByProps({ "data-renderer": "text" })).toHaveLength(0);
     expect(findAllByText(renderer, "Prev")).toHaveLength(0);
   });
 

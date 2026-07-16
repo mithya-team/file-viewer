@@ -118,13 +118,15 @@ Supported file families:
 - Word documents: DOCX, DOTX
 - presentations: PPTX, POTX (static slide preview via pinned Pagus `@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`)
 - markdown when MIME is `text/markdown` or `text/x-markdown` (GFM preview; sanitized). Servers that send `.md` as `text/plain` stay on the text path unless the blob/header MIME is corrected.
-- text when MIME indicates text, including `text/plain`, other `text/*` values except `text/csv` and markdown MIME above, `application/json`, `application/xml`, and `application/javascript`
+- HTML when MIME is `text/html`: detected as `html`, but iframe preview is **opt-in** via `enableHtmlPreview` (default `false` → text fallback). When enabled, content runs in a sandboxed iframe with `allow-scripts` and **without** `allow-same-origin`. Enable only for content you trust — author scripts execute and may fetch remote images/CSS/fonts. `application/xhtml+xml` is not HTML in v1.
+- text when MIME indicates text, including `text/plain`, other `text/*` values except `text/csv`, markdown MIME, and `text/html` above, `application/json`, `application/xml`, and `application/javascript`
 
 Current limits:
 
 - renderer selection is content-driven, not extension-driven
-- unlabeled text/CSV/markdown blobs are unsupported unless loaded MIME/header data identifies them
+- unlabeled text/CSV/markdown/HTML blobs are unsupported unless loaded MIME/header data identifies them
 - markdown remote images may be fetched by the browser from URLs in the document; the package does not proxy them
+- HTML preview (when `enableHtmlPreview`) may fetch remote subresources from the document; the package does not rewrite or block them
 - progressive rendering is not supported in v1
 
 ## Detection Contract

@@ -11,6 +11,7 @@ import { TiffRenderer } from "./renderers/TiffRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./renderers/rendererViewport";
 import { MarkdownRenderer } from "./renderers/MarkdownRenderer";
+import { HtmlRenderer } from "./renderers/HtmlRenderer";
 import { TextRenderer } from "./renderers/TextRenderer";
 import {
   clampImageZoom,
@@ -228,6 +229,14 @@ function createChromeApi({
           downloadUrl,
         },
       };
+    case "html":
+      return {
+        file: {
+          kind: "html",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+      };
     case "unsupported":
       return {
         file: {
@@ -246,6 +255,7 @@ export function FileViewer({
   source,
   className,
   chrome = "default",
+  enableHtmlPreview = false,
   renderFallback,
   onError,
 }: FileViewerProps) {
@@ -478,6 +488,12 @@ export function FileViewer({
       {state.detection.kind === "text" && <TextRenderer blob={state.blob} onError={handleRenderError} />}
       {state.detection.kind === "markdown" && (
         <MarkdownRenderer blob={state.blob} onError={handleRenderError} />
+      )}
+      {state.detection.kind === "html" && enableHtmlPreview && (
+        <HtmlRenderer blob={state.blob} onError={handleRenderError} />
+      )}
+      {state.detection.kind === "html" && !enableHtmlPreview && (
+        <TextRenderer blob={state.blob} onError={handleRenderError} />
       )}
       {state.detection.kind === "image" && isTiffDetection(state.detection) && (
         <TiffRenderer

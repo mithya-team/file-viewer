@@ -126,6 +126,36 @@ describe("detectFileKind", () => {
     expect(result.kind).toBe("text");
   });
 
+  it("detects text/html as html", async () => {
+    const blob = new Blob(["<!doctype html><html><body>Hi</body></html>"], {
+      type: "text/html",
+    });
+    const result = await detectFileKind(blob);
+    expect(result).toEqual({ kind: "html", mimeType: "text/html" });
+  });
+
+  it("does not trust html MIME when bytes are not text", async () => {
+    const blob = new Blob([new Uint8Array([0xff, 0xfe, 0xfd, 0xfc])], {
+      type: "text/html",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("unsupported");
+  });
+
+  it("does not treat xhtml MIME as html", async () => {
+    const blob = new Blob(["<html xmlns='http://www.w3.org/1999/xhtml'></html>"], {
+      type: "application/xhtml+xml",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).not.toBe("html");
+  });
+
+  it("does not infer html from unlabeled markup", async () => {
+    const blob = new Blob(["<!doctype html><html><body>Hi</body></html>"]);
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("unsupported");
+  });
+
   it("does not treat unknown zip payloads as supported openxml formats", async () => {
     const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "custom/content.xml"], {
       type: "application/zip",

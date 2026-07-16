@@ -1,6 +1,6 @@
 ## Goal
 
-Build a React file-viewer package that exports one simple component for images, spreadsheets, PDFs, Word documents, markdown, and labeled text files.
+Build a React file-viewer package that exports one simple component for images, spreadsheets, PDFs, Word documents, markdown, HTML (opt-in iframe preview), and labeled text files.
 
 Supported v1 formats:
 
@@ -9,6 +9,7 @@ Supported v1 formats:
 - Documents: `pdf`, `docx`, `dotx`, `pptx`, `potx`
 - Text: `txt` and other text payloads when loaded MIME data identifies them as text
 - Markdown: `text/markdown` and `text/x-markdown` via internal `MarkdownRenderer` (GFM + sanitize). Unlabeled markdown-looking blobs stay unsupported.
+- HTML: `text/html` via internal `HtmlRenderer` only when `enableHtmlPreview` is true (sandboxed iframe with `allow-scripts`, no `allow-same-origin`). Default falls back to text renderer. No xhtml MIME in v1.
 
 `pptx` / `potx` use internal `PptxRenderer` on **[Pagus](https://github.com/pagus-kit/Pagus)** (`@pagus-kit/core` + `@pagus-kit/renderer`, pinned at `0.1.1`). Buffered `Blob` → `parse` → per-slide `renderSlide` SVG inside package chrome. Static preview only.
 
@@ -70,6 +71,7 @@ flowchart TD
   Router --> PptxRenderer[PPTX POTX Renderer]
   Router --> TextRenderer[Text Renderer]
   Router --> MarkdownRenderer[Markdown Renderer]
+  Router --> HtmlRenderer[Html Renderer]
   Router --> UnsupportedState[Unsupported State]
 ```
 

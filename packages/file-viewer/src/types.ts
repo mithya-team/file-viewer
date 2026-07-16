@@ -10,6 +10,7 @@ export type FileKind =
   | "pptx"
   | "text"
   | "markdown"
+  | "html"
   | "unsupported";
 
 export type DetectionResult = {
@@ -114,6 +115,10 @@ export type MarkdownChromeApi = {
   file: ChromeFileBase<"markdown">;
 };
 
+export type HtmlChromeApi = {
+  file: ChromeFileBase<"html">;
+};
+
 export type UnsupportedChromeApi = {
   file: ChromeFileBase<"unsupported">;
 };
@@ -126,6 +131,7 @@ export type FileViewerChromeApi =
   | PptxChromeApi
   | TextChromeApi
   | MarkdownChromeApi
+  | HtmlChromeApi
   | UnsupportedChromeApi;
 
 export type FileViewerChrome =
@@ -137,6 +143,12 @@ export interface FileViewerProps {
   source: FileViewerSource;
   className?: string;
   chrome?: FileViewerChrome;
+  /**
+   * When true, `text/html` sources render in a sandboxed iframe (`allow-scripts`,
+   * no `allow-same-origin`). Default false: HTML falls back to the text renderer.
+   * Only enable for content you trust — author scripts run and may fetch remote subresources.
+   */
+  enableHtmlPreview?: boolean;
   renderFallback?: (reason: "unsupported" | "error") => ReactNode;
   onError?: (error: Error, context: FileViewerErrorContext) => void;
 }
