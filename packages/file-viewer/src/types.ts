@@ -9,6 +9,7 @@ export type FileKind =
   | "docx"
   | "pptx"
   | "text"
+  | "markdown"
   | "unsupported";
 
 export type DetectionResult = {
@@ -109,6 +110,10 @@ export type TextChromeApi = {
   file: ChromeFileBase<"text">;
 };
 
+export type MarkdownChromeApi = {
+  file: ChromeFileBase<"markdown">;
+};
+
 export type UnsupportedChromeApi = {
   file: ChromeFileBase<"unsupported">;
 };
@@ -120,6 +125,7 @@ export type FileViewerChromeApi =
   | DocxChromeApi
   | PptxChromeApi
   | TextChromeApi
+  | MarkdownChromeApi
   | UnsupportedChromeApi;
 
 export type FileViewerChrome =

@@ -17,6 +17,7 @@ import {
 
 const FILE_LABELS: Record<DemoFileType, string> = {
   text: "Text",
+  markdown: "Markdown",
   csv: "CSV",
   image: "Image (JPEG)",
   tiffMulti: "TIFF (multi-page)",
@@ -31,6 +32,7 @@ const FILE_LABELS: Record<DemoFileType, string> = {
 
 const FILE_PATHS: Record<DemoFileType, string> = {
   text: "/sample-files/2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding%20Agreement_%20Agency%20Agreement.txt",
+  markdown: "/sample-files/sample.md",
   csv: "/sample-files/blank%20rfp%20-shortened.csv",
   image: "/sample-files/mountains.jpg",
   tiffMulti: "/sample-files/Multi_page24bpp.tif",
@@ -125,7 +127,19 @@ async function buildSource(
 
   const path = FILE_PATHS[fileType];
   const absoluteUrl = toAbsoluteFixtureUrl(path);
-  if (mode === "url") return absoluteUrl;
+  if (mode === "url") {
+    if (fileType === "markdown") {
+      const response = await fetch(absoluteUrl);
+      if (!response.ok) {
+        throw new Error(
+          `Fixture fetch failed (${response.status}) for ${absoluteUrl}`,
+        );
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return `data:text/markdown;base64,${await toBase64FromBytes(bytes)}`;
+    }
+    return absoluteUrl;
+  }
 
   const response = await fetch(absoluteUrl);
   if (!response.ok) {
@@ -135,13 +149,22 @@ async function buildSource(
   }
 
   if (mode === "blob") {
+    if (fileType === "markdown") {
+      return new Blob([await response.arrayBuffer()], { type: "text/markdown" });
+    }
     return response.blob();
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (mode === "stream") {
+    if (fileType === "markdown") {
+      return new Blob([bytes], { type: "text/markdown" });
+    }
     return createStreamFromBytes(bytes);
   }
 
+  if (fileType === "markdown") {
+    return new Blob([bytes], { type: "text/markdown" });
+  }
   return toBase64FromBytes(bytes);
 }
 

@@ -1,5 +1,6 @@
 export type DemoFileType =
   | "text"
+  | "markdown"
   | "csv"
   | "image"
   | "tiffMulti"
@@ -25,6 +26,7 @@ export type DemoControls = {
 
 const FILE_TYPES: readonly DemoFileType[] = [
   "text",
+  "markdown",
   "csv",
   "image",
   "tiffMulti",

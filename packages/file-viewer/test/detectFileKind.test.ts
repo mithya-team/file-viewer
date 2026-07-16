@@ -92,6 +92,40 @@ describe("detectFileKind", () => {
     expect(result.kind).toBe("pptx");
   });
 
+  it("detects text/markdown as markdown", async () => {
+    const blob = new Blob(["# Hello\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"], {
+      type: "text/markdown",
+    });
+    const result = await detectFileKind(blob);
+    expect(result).toEqual({ kind: "markdown", mimeType: "text/markdown" });
+  });
+
+  it("detects text/x-markdown as markdown", async () => {
+    const blob = new Blob(["# Title"], { type: "text/x-markdown" });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("markdown");
+  });
+
+  it("does not trust markdown MIME when bytes are not text", async () => {
+    const blob = new Blob([new Uint8Array([0xff, 0xfe, 0xfd, 0xfc])], {
+      type: "text/markdown",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("unsupported");
+  });
+
+  it("does not infer markdown from unlabeled heading text", async () => {
+    const blob = new Blob(["# Hello"]);
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("unsupported");
+  });
+
+  it("keeps text/plain on the text path", async () => {
+    const blob = new Blob(["# Looks like markdown"], { type: "text/plain" });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("text");
+  });
+
   it("does not treat unknown zip payloads as supported openxml formats", async () => {
     const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "custom/content.xml"], {
       type: "application/zip",

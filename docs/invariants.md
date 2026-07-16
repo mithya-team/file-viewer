@@ -35,8 +35,9 @@ This file details what not to do when building this library/package.
 
 ## Format Scope
 
-- Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, `pptx`, `potx`, and text files.
-- Must treat `txt` and `csv` support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic routing.
+- Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, `pptx`, `potx`, text files, and markdown (`text/markdown`, `text/x-markdown`).
+- Must treat `txt`, `csv`, and markdown support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic or extension routing.
+- Must render markdown through an internal `MarkdownRenderer` with GFM + sanitization (static preview only).
 - Must render `dotx` through the DOCX path only.
 - Must render `potx` through the PPTX path only.
 - Must not execute template behavior, embedded actions, macros, scripts, or external document side effects.

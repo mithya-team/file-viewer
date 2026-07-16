@@ -10,6 +10,7 @@ import { PdfRenderer } from "./renderers/PdfRenderer";
 import { TiffRenderer } from "./renderers/TiffRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./renderers/rendererViewport";
+import { MarkdownRenderer } from "./renderers/MarkdownRenderer";
 import { TextRenderer } from "./renderers/TextRenderer";
 import {
   clampImageZoom,
@@ -215,6 +216,14 @@ function createChromeApi({
       return {
         file: {
           kind: "text",
+          mimeType: detection.mimeType,
+          downloadUrl,
+        },
+      };
+    case "markdown":
+      return {
+        file: {
+          kind: "markdown",
           mimeType: detection.mimeType,
           downloadUrl,
         },
@@ -467,6 +476,9 @@ export function FileViewer({
   const readyContent = state.status !== "ready" || renderError != null ? fallback : (
     <>
       {state.detection.kind === "text" && <TextRenderer blob={state.blob} onError={handleRenderError} />}
+      {state.detection.kind === "markdown" && (
+        <MarkdownRenderer blob={state.blob} onError={handleRenderError} />
+      )}
       {state.detection.kind === "image" && isTiffDetection(state.detection) && (
         <TiffRenderer
           blob={state.blob}

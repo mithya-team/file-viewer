@@ -117,12 +117,14 @@ Supported file families:
 - spreadsheets: XLSX, XLS, CSV
 - Word documents: DOCX, DOTX
 - presentations: PPTX, POTX (static slide preview via pinned Pagus `@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`)
-- text when MIME indicates text, including `text/plain`, other `text/*` values except `text/csv`, `application/json`, `application/xml`, and `application/javascript`
+- markdown when MIME is `text/markdown` or `text/x-markdown` (GFM preview; sanitized). Servers that send `.md` as `text/plain` stay on the text path unless the blob/header MIME is corrected.
+- text when MIME indicates text, including `text/plain`, other `text/*` values except `text/csv` and markdown MIME above, `application/json`, `application/xml`, and `application/javascript`
 
 Current limits:
 
 - renderer selection is content-driven, not extension-driven
-- unlabeled text/CSV blobs are unsupported unless loaded MIME/header data identifies them
+- unlabeled text/CSV/markdown blobs are unsupported unless loaded MIME/header data identifies them
+- markdown remote images may be fetched by the browser from URLs in the document; the package does not proxy them
 - progressive rendering is not supported in v1
 
 ## Detection Contract
@@ -143,6 +145,9 @@ Examples:
 ```tsx
 <FileViewer source={new Blob(["hello"], { type: "text/plain" })} />
 // text
+
+<FileViewer source={new Blob(["# Hi"], { type: "text/markdown" })} />
+// markdown
 
 <FileViewer source={new Blob(["a,b\n1,2\n"], { type: "text/csv" })} />
 // spreadsheet
@@ -294,13 +299,13 @@ Import types from `@file-viewer/react` (type-only imports recommended). Renderer
 
 **Detection:** `FileKind`, `DetectionResult`
 
-**Chrome (per format):** `ImageChromeApi`, `PDFChromeApi`, `SpreadsheetChromeApi`, `DocxChromeApi`, `TextChromeApi`, `UnsupportedChromeApi`, `PptxChromeApi`
+**Chrome (per format):** `ImageChromeApi`, `PDFChromeApi`, `SpreadsheetChromeApi`, `DocxChromeApi`, `TextChromeApi`, `MarkdownChromeApi`, `UnsupportedChromeApi`, `PptxChromeApi`
 
 **Page navigation:** `PageNavigateEvent`, `PageNavigateListener`
 
 **Source classification:** `StringSourceKind`
 
-**Renderer props (types only):** `PdfRendererProps`, `ImageRendererProps`, `SpreadsheetRendererProps`, `DocxRendererProps`, `TextRendererProps`
+**Renderer props (types only):** `PdfRendererProps`, `ImageRendererProps`, `SpreadsheetRendererProps`, `DocxRendererProps`, `TextRendererProps`, `PptxRendererProps`, `MarkdownRendererProps`
 
 **PDF search:** `PdfSearchMatch`, `PdfSearchState`
 

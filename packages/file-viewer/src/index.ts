@@ -14,6 +14,7 @@ export type {
   PageNavigateListener,
   PDFChromeApi,
   SpreadsheetChromeApi,
+  MarkdownChromeApi,
   PptxChromeApi,
   TextChromeApi,
   UnsupportedChromeApi,
@@ -23,6 +24,7 @@ export type { StringSourceKind } from "./source/classifyStringSource";
 
 export type { DocxRendererProps } from "./renderers/DocxRenderer";
 export type { ImageRendererProps } from "./renderers/ImageRenderer";
+export type { MarkdownRendererProps } from "./renderers/MarkdownRenderer";
 export type { PdfRendererProps } from "./renderers/PdfRenderer";
 export type { PptxRendererProps } from "./renderers/PptxRenderer";
 export type { SpreadsheetRendererProps } from "./renderers/SpreadsheetRenderer";

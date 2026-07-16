@@ -115,6 +115,10 @@ vi.mock("../src/renderers/TextRenderer", () => ({
   TextRenderer: () => <div data-renderer="text">Text renderer</div>,
 }));
 
+vi.mock("../src/renderers/MarkdownRenderer", () => ({
+  MarkdownRenderer: () => <div data-renderer="markdown">Markdown renderer</div>,
+}));
+
 vi.mock("../src/renderers/DocxRenderer", () => ({
   DocxRenderer: () => <div data-renderer="docx">Docx renderer</div>,
 }));
@@ -837,6 +841,24 @@ describe("FileViewer", () => {
     });
 
     expect(pptx.props["data-page"]).toBe(3);
+  });
+
+  it("routes markdown to MarkdownRenderer without page controls", async () => {
+    mockResolvedSource({
+      kind: "markdown",
+      mimeType: "text/markdown",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome="default" />);
+    });
+
+    const markdown = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "markdown" })[0] ?? null,
+    );
+    expect(markdown).not.toBeNull();
+    expect(findAllByText(renderer, "MARKDOWN").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Prev")).toHaveLength(0);
   });
 
   it("routes renderer failures through renderFallback and onError", async () => {

@@ -1,6 +1,6 @@
 # Project: file-viewer
 
-A React-based file-viewer library that provides a single `FileViewer` component capable of rendering various file formats (images including classical TIFF, spreadsheets, PDFs, Word documents, and text) based on content detection.
+A React-based file-viewer library that provides a single `FileViewer` component capable of rendering various file formats (images including classical TIFF, spreadsheets, PDFs, Word documents, markdown, and text) based on content detection.
 
 ## Project Overview
 
@@ -70,6 +70,7 @@ A React-based file-viewer library that provides a single `FileViewer` component 
 - Browser-native: JPEG, PNG, GIF, WebP via `ImageRenderer` (single `<img>`, zoom/pan).
 - Classical TIFF (`image/tiff`): magic-byte sniff + `TiffRenderer` — multi-page vertical scroll, lazy UTIF decode per page, `ImageChromeApi` page nav when `pageCount > 1`. Download uses original TIFF bytes.
 - PPTX/POTX: magic-byte / MIME sniff + `PptxRenderer` on pinned Pagus (`@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`) — lazy per-slide SVG, `PptxChromeApi` page nav + zoom. Static preview only.
+- Markdown (`text/markdown`, `text/x-markdown`): MIME sniff + `MarkdownRenderer` (GFM via `react-markdown` + `remark-gfm` + `rehype-sanitize`). Static preview only. No extension/content sniffing in v1.
 - Not in v1 scope: BigTIFF, multi‑GB single-plane TIFF.
 - Custom renderer registration is future work.
 - Progressive rendering is future work.
