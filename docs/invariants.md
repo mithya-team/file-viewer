@@ -37,8 +37,8 @@ This file details what not to do when building this library/package.
 
 - Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, `pptx`, `potx`, text files, markdown (`text/markdown`, `text/x-markdown`), and HTML (`text/html`).
 - Must treat `txt`, `csv`, markdown, and HTML support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic or extension routing.
-- Must render markdown through an internal `MarkdownRenderer` with GFM + sanitization (static preview only).
-- Must detect `text/html` as `html` kind; HTML iframe preview MUST be opt-in via `enableHtmlPreview` (default false). When disabled, HTML MUST fall back to the text renderer. When enabled, MUST use a sandboxed iframe with `allow-scripts` and without `allow-same-origin`. MUST NOT treat `application/xhtml+xml` as HTML in v1.
+- Must render markdown through an internal `MarkdownRenderer` with GFM + sanitization (static preview by default). Shell MUST expose Preview | Source via chrome (`markdown.viewMode` / `setViewMode`); Source MUST mount the text renderer (plain monospace).
+- Must detect `text/html` as `html` kind; HTML iframe preview MUST be opt-in via `enableHtmlPreview` (default false). When disabled, HTML MUST fall back to the text renderer with no Preview | Source toggle. When enabled, MUST use a sandboxed iframe with `allow-scripts` and without `allow-same-origin` for Preview, expose optional `html.viewMode` / `setViewMode`, and allow Source via the text renderer. Flipping `enableHtmlPreview` to false MUST force the text path and drop the toggle. MUST NOT treat `application/xhtml+xml` as HTML in v1.
 - Must render `dotx` through the DOCX path only.
 - Must render `potx` through the PPTX path only.
 - Must not execute template behavior, embedded actions, macros, scripts, or external document side effects.

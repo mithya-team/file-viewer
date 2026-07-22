@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 import { PdfPageInput } from "./primitives/PdfPageInput";
 import { ViewerButton } from "./primitives/ViewerButton";
-import type { FileViewerChromeApi, ImageChromeApi, PDFChromeApi, PptxChromeApi, SpreadsheetChromeApi } from "./types";
+import type {
+  FileViewerChromeApi,
+  HtmlChromeApi,
+  ImageChromeApi,
+  MarkdownChromeApi,
+  PDFChromeApi,
+  PptxChromeApi,
+  SpreadsheetChromeApi,
+} from "./types";
 
 interface FileViewerDefaultChromeProps {
   api: FileViewerChromeApi;
@@ -23,6 +31,14 @@ function isSpreadsheetChromeApi(
 
 function isPptxChromeApi(api: FileViewerChromeApi): api is PptxChromeApi {
   return api.file.kind === "pptx";
+}
+
+function isMarkdownChromeApi(api: FileViewerChromeApi): api is MarkdownChromeApi {
+  return api.file.kind === "markdown";
+}
+
+function isHtmlChromeApi(api: FileViewerChromeApi): api is HtmlChromeApi {
+  return api.file.kind === "html";
 }
 
 export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
@@ -126,6 +142,41 @@ export function FileViewerDefaultChrome({ api }: FileViewerDefaultChromeProps) {
           ))}
         </div>
       );
+  } else if (isMarkdownChromeApi(api)) {
+    controls = (
+      <div className="flex items-center gap-2">
+        <ViewerButton
+          active={api.markdown.viewMode === "preview"}
+          onClick={() => api.markdown.setViewMode("preview")}
+        >
+          Preview
+        </ViewerButton>
+        <ViewerButton
+          active={api.markdown.viewMode === "source"}
+          onClick={() => api.markdown.setViewMode("source")}
+        >
+          Source
+        </ViewerButton>
+      </div>
+    );
+  } else if (isHtmlChromeApi(api) && api.html != null) {
+    const htmlControls = api.html;
+    controls = (
+      <div className="flex items-center gap-2">
+        <ViewerButton
+          active={htmlControls.viewMode === "preview"}
+          onClick={() => htmlControls.setViewMode("preview")}
+        >
+          Preview
+        </ViewerButton>
+        <ViewerButton
+          active={htmlControls.viewMode === "source"}
+          onClick={() => htmlControls.setViewMode("source")}
+        >
+          Source
+        </ViewerButton>
+      </div>
+    );
   }
 
   return (

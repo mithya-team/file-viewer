@@ -1,6 +1,7 @@
 export { FileViewer } from "./FileViewer";
 
 export type {
+  ContentViewMode,
   DetectionResult,
   DocxChromeApi,
   FileKind,

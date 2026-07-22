@@ -117,8 +117,8 @@ Supported file families:
 - spreadsheets: XLSX, XLS, CSV
 - Word documents: DOCX, DOTX
 - presentations: PPTX, POTX (static slide preview via pinned Pagus `@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`)
-- markdown when MIME is `text/markdown` or `text/x-markdown` (GFM preview; sanitized). Servers that send `.md` as `text/plain` stay on the text path unless the blob/header MIME is corrected.
-- HTML when MIME is `text/html`: detected as `html`, but iframe preview is **opt-in** via `enableHtmlPreview` (default `false` → text fallback). When enabled, content runs in a sandboxed iframe with `allow-scripts` and **without** `allow-same-origin`. Enable only for content you trust — author scripts execute and may fetch remote images/CSS/fonts. `application/xhtml+xml` is not HTML in v1.
+- markdown when MIME is `text/markdown` or `text/x-markdown` (GFM preview; sanitized). Default chrome offers **Preview | Source** (source = plain monospace via the text renderer). Servers that send `.md` as `text/plain` stay on the text path unless the blob/header MIME is corrected.
+- HTML when MIME is `text/html`: detected as `html`, but iframe preview is **opt-in** via `enableHtmlPreview` (default `false` → text fallback). When enabled, default chrome offers **Preview | Source** (source = plain monospace; preview = sandboxed iframe with `allow-scripts` and **without** `allow-same-origin`). When preview is disabled, there is no toggle — text path only. Enable only for content you trust — author scripts execute and may fetch remote images/CSS/fonts. `application/xhtml+xml` is not HTML in v1.
 - text when MIME indicates text, including `text/plain`, other `text/*` values except `text/csv`, markdown MIME, and `text/html` above, `application/json`, `application/xml`, and `application/javascript`
 
 Current limits:
@@ -304,7 +304,9 @@ Import types from `@file-viewer/react` (type-only imports recommended). Renderer
 
 **Detection:** `FileKind`, `DetectionResult`
 
-**Chrome (per format):** `ImageChromeApi`, `PDFChromeApi`, `SpreadsheetChromeApi`, `DocxChromeApi`, `TextChromeApi`, `MarkdownChromeApi`, `UnsupportedChromeApi`, `PptxChromeApi`
+**Chrome (per format):** `ImageChromeApi`, `PDFChromeApi`, `SpreadsheetChromeApi`, `DocxChromeApi`, `TextChromeApi`, `MarkdownChromeApi`, `HtmlChromeApi`, `UnsupportedChromeApi`, `PptxChromeApi`
+
+**Content view mode:** `ContentViewMode` (`"preview" | "source"`) — used by markdown chrome always and by html chrome when `enableHtmlPreview` is true
 
 **Page navigation:** `PageNavigateEvent`, `PageNavigateListener`
 

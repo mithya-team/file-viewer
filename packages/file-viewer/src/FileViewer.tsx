@@ -21,6 +21,7 @@ import {
 } from "./image/imageZoom";
 import { loadSourceToBlob } from "./source/loadSourceToBlob";
 import type {
+  ContentViewMode,
   DetectionResult,
   FileViewerChromeApi,
   FileViewerProps,
@@ -75,6 +76,9 @@ function emitPageNavigateSettled(
 function createChromeApi({
   detection,
   downloadUrl,
+  enableHtmlPreview,
+  viewMode,
+  setViewMode,
   pdfPage,
   pdfPageCount,
   pdfGeometryReady,
@@ -102,6 +106,9 @@ function createChromeApi({
 }: {
   detection: DetectionResult;
   downloadUrl: string | null;
+  enableHtmlPreview: boolean;
+  viewMode: ContentViewMode;
+  setViewMode: (mode: ContentViewMode) => void;
   pdfPage: number;
   pdfPageCount: number;
   pdfGeometryReady: boolean;
@@ -238,6 +245,10 @@ function createChromeApi({
           mimeType: detection.mimeType,
           downloadUrl,
         },
+        markdown: {
+          viewMode,
+          setViewMode,
+        },
       };
     case "html":
       return {
@@ -246,6 +257,14 @@ function createChromeApi({
           mimeType: detection.mimeType,
           downloadUrl,
         },
+        ...(enableHtmlPreview
+          ? {
+              html: {
+                viewMode,
+                setViewMode,
+              },
+            }
+          : {}),
       };
     case "unsupported":
       return {
@@ -290,6 +309,7 @@ export function FileViewer({
   const [pptxZoom, setPptxZoom] = useState(100);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<ContentViewMode>("preview");
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
   const pdfPendingPageRef = useRef<number | null>(null);
@@ -365,6 +385,7 @@ export function FileViewer({
     setPptxZoom(100);
     setSheetNames([]);
     setActiveSheetIndex(0);
+    setViewMode("preview");
   }, [source]);
 
   useEffect(() => {
@@ -399,6 +420,7 @@ export function FileViewer({
   const readyDetectionKind = state.status === "ready" ? state.detection.kind : null;
   useEffect(() => {
     if (readyDetectionKind == null) return;
+    setViewMode("preview");
   }, [readyDetectionKind]);
 
   useEffect(() => {
@@ -520,6 +542,9 @@ export function FileViewer({
     return createChromeApi({
       detection: state.detection,
       downloadUrl: state.status === "ready" ? downloadUrl : null,
+      enableHtmlPreview,
+      viewMode,
+      setViewMode,
       pdfPage,
       pdfPageCount,
       pdfGeometryReady,
@@ -548,6 +573,7 @@ export function FileViewer({
   }, [
     activeSheetIndex,
     downloadUrl,
+    enableHtmlPreview,
     imageGeometryReady,
     imagePage,
     imagePageCount,
@@ -566,6 +592,7 @@ export function FileViewer({
     subscribeImagePageNavigate,
     subscribePdfPageNavigate,
     subscribePptxPageNavigate,
+    viewMode,
   ]);
 
   const chromeContent = useMemo(() => {
@@ -581,13 +608,17 @@ export function FileViewer({
   const readyContent = state.status !== "ready" || renderError != null ? fallback : (
     <>
       {state.detection.kind === "text" && <TextRenderer blob={state.blob} onError={handleRenderError} />}
-      {state.detection.kind === "markdown" && (
+      {state.detection.kind === "markdown" && viewMode === "preview" && (
         <MarkdownRenderer blob={state.blob} onError={handleRenderError} />
       )}
-      {state.detection.kind === "html" && enableHtmlPreview && (
+      {state.detection.kind === "markdown" && viewMode === "source" && (
+        <TextRenderer blob={state.blob} onError={handleRenderError} />
+      )}
+      {state.detection.kind === "html" && enableHtmlPreview && viewMode === "preview" && (
         <HtmlRenderer blob={state.blob} onError={handleRenderError} />
       )}
-      {state.detection.kind === "html" && !enableHtmlPreview && (
+      {state.detection.kind === "html"
+        && (!enableHtmlPreview || viewMode === "source") && (
         <TextRenderer blob={state.blob} onError={handleRenderError} />
       )}
       {state.detection.kind === "image" && isTiffDetection(state.detection) && (

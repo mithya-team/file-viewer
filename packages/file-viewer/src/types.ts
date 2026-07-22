@@ -114,12 +114,22 @@ export type TextChromeApi = {
   file: ChromeFileBase<"text">;
 };
 
+export type ContentViewMode = "preview" | "source";
+
 export type MarkdownChromeApi = {
   file: ChromeFileBase<"markdown">;
+  markdown: {
+    viewMode: ContentViewMode;
+    setViewMode: (mode: ContentViewMode) => void;
+  };
 };
 
 export type HtmlChromeApi = {
   file: ChromeFileBase<"html">;
+  html?: {
+    viewMode: ContentViewMode;
+    setViewMode: (mode: ContentViewMode) => void;
+  };
 };
 
 export type UnsupportedChromeApi = {
