@@ -10,6 +10,8 @@ export type UsePaginatedScrollStackOptions = {
   numPages: number;
   isDocumentLoading: boolean;
   page: number;
+  /** Bump to re-run programmatic scroll even when `page` is unchanged. */
+  navIntent?: number;
   onVisiblePageChange?: (page: number) => void;
   onPageNearViewport: (pageNum: number) => void;
   /** Return target scrollTop for `page`, or null if geometry is not ready yet. */
@@ -42,6 +44,7 @@ export function usePaginatedScrollStack({
   numPages,
   isDocumentLoading,
   page,
+  navIntent = 0,
   onVisiblePageChange,
   onPageNearViewport,
   getPageScrollTop,
@@ -114,6 +117,9 @@ export function usePaginatedScrollStack({
 
     const targetTop = getPageScrollTopRef.current(targetPage);
     if (targetTop == null) {
+      // Hold IO guard for the whole geometry wait (timer refreshed each retry).
+      programmaticScrollRef.current = true;
+      clearProgrammaticGuardTimer();
       if (geometryRetryTimerRef.current != null) {
         clearTimeout(geometryRetryTimerRef.current);
       }
@@ -256,14 +262,18 @@ export function usePaginatedScrollStack({
     if (isDocumentLoading || numPages === 0) return;
     const clamped = Math.min(Math.max(page, 1), numPages);
     const generation = ++navGenerationRef.current;
-    const emitSettle = !skipSettleOnceRef.current;
+    // Skip settle only for the default first landing on page 1; citation jumps settle.
+    const emitSettle = !skipSettleOnceRef.current || clamped !== 1;
     skipSettleOnceRef.current = false;
     if (geometryRetryTimerRef.current != null) {
       clearTimeout(geometryRetryTimerRef.current);
       geometryRetryTimerRef.current = null;
     }
+    // Arm guard immediately so IO cannot overwrite before first geometry check.
+    programmaticScrollRef.current = true;
+    clearProgrammaticGuardTimer();
     runProgrammaticScroll(clamped, generation, emitSettle);
-  }, [isDocumentLoading, numPages, page, runProgrammaticScroll]);
+  }, [clearProgrammaticGuardTimer, isDocumentLoading, navIntent, numPages, page, runProgrammaticScroll]);
 
   useEffect(() => {
     if (isDocumentLoading || numPages === 0) return;

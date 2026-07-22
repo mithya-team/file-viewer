@@ -18,6 +18,10 @@ describe("shouldReportVisiblePageChange", () => {
   it("ignores callbacks while layout is settling after zoom", () => {
     expect(shouldReportVisiblePageChange(2, 1, false, true)).toBe(false);
   });
+
+  it("ignores callbacks while geometry wait holds the programmatic guard", () => {
+    expect(shouldReportVisiblePageChange(1, 10, true)).toBe(false);
+  });
 });
 
 describe("programmatic scroll echo", () => {

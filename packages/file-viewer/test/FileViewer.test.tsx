@@ -62,16 +62,19 @@ vi.mock("../src/renderers/TiffRenderer", () => {
       page,
       zoom,
       onPageCountChange,
+      onGeometryReadyChange,
       onVisiblePageChange,
     }: {
       page: number;
       zoom: number;
       onPageCountChange: (count: number) => void;
+      onGeometryReadyChange?: (ready: boolean) => void;
       onVisiblePageChange?: (page: number) => void;
     }) => {
       useEffect(() => {
         onPageCountChange(2);
-      }, [onPageCountChange]);
+        onGeometryReadyChange?.(true);
+      }, [onGeometryReadyChange, onPageCountChange]);
       return (
         <div
           data-renderer="tiff"
@@ -134,16 +137,19 @@ vi.mock("../src/renderers/PptxRenderer", () => {
       page,
       zoom,
       onPageCountChange,
+      onGeometryReadyChange,
       onVisiblePageChange,
     }: {
       page: number;
       zoom: number;
       onPageCountChange: (count: number) => void;
+      onGeometryReadyChange?: (ready: boolean) => void;
       onVisiblePageChange?: (page: number) => void;
     }) => {
       useEffect(() => {
         onPageCountChange(5);
-      }, [onPageCountChange]);
+        onGeometryReadyChange?.(true);
+      }, [onGeometryReadyChange, onPageCountChange]);
       return (
         <div
           data-renderer="pptx"
@@ -165,17 +171,20 @@ vi.mock("../src/renderers/PdfRenderer", () => ({
     zoom,
     onError,
     onPageCountChange,
+    onGeometryReadyChange,
   }: {
     blob: Blob;
     page: number;
     zoom: number;
     onError: (error: Error) => void;
     onPageCountChange: (pageCount: number) => void;
+    onGeometryReadyChange?: (ready: boolean) => void;
   }) => {
     if (!seenPdfBlobs.has(blob)) {
       seenPdfBlobs.add(blob);
       queueMicrotask(() => {
         onPageCountChange(3);
+        onGeometryReadyChange?.(true);
       });
     }
 
@@ -403,6 +412,85 @@ describe("FileViewer", () => {
     expect(findAllByText(renderer, "Custom download").length).toBeGreaterThan(
       0,
     );
+  });
+
+    it("queues early pdf setPage until pageCount is known", async () => {
+    mockResolvedSource({
+      kind: "pdf",
+      mimeType: "application/pdf",
+    });
+
+    let latestApi: PDFChromeApi | null = null;
+
+    function CitationChrome({ api }: { api: FileViewerChromeApi }) {
+      if (!isPDFChromeApi(api)) return null;
+      latestApi = api;
+      return (
+        <div data-chrome-kind="pdf">
+          <span>{`page:${api.pdf.page}/${api.pdf.pageCount}`}</span>
+          <span>{`geometry:${api.pdf.geometryReady ? "ready" : "pending"}`}</span>
+          <button type="button" onClick={() => api.pdf.setPage(3)}>
+            Cite
+          </button>
+        </div>
+      );
+    }
+
+    await act(async () => {
+      renderer = create(
+        <FileViewer source="citation-early-setpage" chrome={CitationChrome} />,
+      );
+    });
+
+    // Call setPage while pageCount may still be 0 / before geometry ready.
+    await act(async () => {
+      latestApi?.pdf.setPage(3);
+    });
+
+    await waitFor(() => (latestApi != null && latestApi.pdf.pageCount === 3 ? latestApi : null));
+    expect(latestApi?.pdf.page).toBe(3);
+    await waitFor(() => (latestApi?.pdf.geometryReady ? latestApi : null));
+    expect(
+      findAllByText(renderer, "PDF renderer page=3 zoom=100").length,
+    ).toBeGreaterThan(0);
+  });
+
+it("routes html to HtmlRenderer when enableHtmlPreview is true", async () => {
+    mockResolvedSource({
+      kind: "html",
+      mimeType: "text/html",
+    });
+
+    await act(async () => {
+      renderer = create(
+        <FileViewer source="fixture" chrome="default" enableHtmlPreview />,
+      );
+    });
+
+    const html = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "html" })[0] ?? null,
+    );
+    expect(html).not.toBeNull();
+    expect(renderer?.root.findAllByProps({ "data-renderer": "text" })).toHaveLength(0);
+    expect(findAllByText(renderer, "Prev")).toHaveLength(0);
+  });
+
+  it("routes markdown to MarkdownRenderer without page controls", async () => {
+    mockResolvedSource({
+      kind: "markdown",
+      mimeType: "text/markdown",
+    });
+
+    await act(async () => {
+      renderer = create(<FileViewer source="fixture" chrome="default" />);
+    });
+
+    const markdown = await waitFor(
+      () => renderer?.root.findAllByProps({ "data-renderer": "markdown" })[0] ?? null,
+    );
+    expect(markdown).not.toBeNull();
+    expect(findAllByText(renderer, "MARKDOWN").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Prev")).toHaveLength(0);
   });
 
   it("exposes workbook sheet controls but not csv sheet controls", async () => {
@@ -847,23 +935,7 @@ describe("FileViewer", () => {
     expect(pptx.props["data-page"]).toBe(3);
   });
 
-  it("routes markdown to MarkdownRenderer without page controls", async () => {
-    mockResolvedSource({
-      kind: "markdown",
-      mimeType: "text/markdown",
-    });
 
-    await act(async () => {
-      renderer = create(<FileViewer source="fixture" chrome="default" />);
-    });
-
-    const markdown = await waitFor(
-      () => renderer?.root.findAllByProps({ "data-renderer": "markdown" })[0] ?? null,
-    );
-    expect(markdown).not.toBeNull();
-    expect(findAllByText(renderer, "MARKDOWN").length).toBeGreaterThan(0);
-    expect(findAllByText(renderer, "Prev")).toHaveLength(0);
-  });
 
   it("defaults html to text fallback without iframe", async () => {
     mockResolvedSource({
@@ -881,27 +953,15 @@ describe("FileViewer", () => {
     expect(text).not.toBeNull();
     expect(renderer?.root.findAllByProps({ "data-renderer": "html" })).toHaveLength(0);
     expect(findAllByText(renderer, "HTML").length).toBeGreaterThan(0);
+    expect(findAllByText(renderer, "Preview")).toHaveLength(0);
+    expect(findAllByText(renderer, "Source")).toHaveLength(0);
   });
 
-  it("routes html to HtmlRenderer when enableHtmlPreview is true", async () => {
-    mockResolvedSource({
-      kind: "html",
-      mimeType: "text/html",
-    });
 
-    await act(async () => {
-      renderer = create(
-        <FileViewer source="fixture" chrome="default" enableHtmlPreview />,
-      );
-    });
 
-    const html = await waitFor(
-      () => renderer?.root.findAllByProps({ "data-renderer": "html" })[0] ?? null,
-    );
-    expect(html).not.toBeNull();
-    expect(renderer?.root.findAllByProps({ "data-renderer": "text" })).toHaveLength(0);
-    expect(findAllByText(renderer, "Prev")).toHaveLength(0);
-  });
+
+
+
 
   it("routes renderer failures through renderFallback and onError", async () => {
     const onError = vi.fn();

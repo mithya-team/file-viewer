@@ -13,9 +13,11 @@ import { usePaginatedScrollStack } from "./usePaginatedScrollStack";
 export interface TiffRendererProps {
   blob: Blob;
   page: number;
+  navIntent?: number;
   zoom: number;
   onError: (error: Error) => void;
   onPageCountChange: (pageCount: number) => void;
+  onGeometryReadyChange?: (ready: boolean) => void;
   onVisiblePageChange?: (page: number) => void;
   onProgrammaticPageNavigateSettled?: (page: number) => void;
 }
@@ -50,9 +52,11 @@ function revokeDisplayUrls(urls: Map<number, string>) {
 export function TiffRenderer({
   blob,
   page,
+  navIntent = 0,
   zoom,
   onError,
   onPageCountChange,
+  onGeometryReadyChange,
   onVisiblePageChange,
   onProgrammaticPageNavigateSettled,
 }: TiffRendererProps) {
@@ -64,8 +68,10 @@ export function TiffRenderer({
 
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
+  const onGeometryReadyChangeRef = useRef(onGeometryReadyChange);
   onErrorRef.current = onError;
   onPageCountChangeRef.current = onPageCountChange;
+  onGeometryReadyChangeRef.current = onGeometryReadyChange;
 
   const [numPages, setNumPages] = useState(0);
   const [pageSizes, setPageSizes] = useState<Map<number, { w: number; h: number }>>(new Map());
@@ -85,6 +91,7 @@ export function TiffRenderer({
     numPages,
     isDocumentLoading,
     page,
+    navIntent,
     layoutKey: zoom,
     onVisiblePageChange,
     onPageNearViewport: (pageNum) => {
@@ -154,6 +161,7 @@ export function TiffRenderer({
     decodingRef.current.clear();
     bufferRef.current = null;
     ifdsRef.current = [];
+    onGeometryReadyChangeRef.current?.(false);
 
     void blob
       .arrayBuffer()
@@ -180,6 +188,7 @@ export function TiffRenderer({
         setNumPages(ifds.length);
         onPageCountChangeRef.current(ifds.length);
         setIsDocumentLoading(false);
+        onGeometryReadyChangeRef.current?.(true);
       })
       .catch((error) => {
         if (!active) return;
@@ -190,6 +199,7 @@ export function TiffRenderer({
       active = false;
       revokeDisplayUrls(displayUrlsRef.current);
       decodingRef.current.clear();
+      onGeometryReadyChangeRef.current?.(false);
     };
   }, [blob]);
 

@@ -313,9 +313,17 @@ export default function App() {
       <main className="min-h-0 min-w-0 flex-1 p-4">
         <div className="flex h-full min-h-0 flex-col gap-3">
           <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700 shadow-sm">
-            <strong className="font-semibold text-slate-950">
-              FileViewer demo
-            </strong>
+            <div className="flex items-center gap-3">
+              <strong className="font-semibold text-slate-950">
+                FileViewer demo
+              </strong>
+              <a
+                href="/citation?kind=pdf&page=3"
+                className="text-slate-600 underline-offset-2 hover:underline"
+              >
+                Citation scroll →
+              </a>
+            </div>
             <span>
               File: {FILE_LABELS[fileType]} | Source: {mode.toUpperCase()} | Scenario: {SCENARIO_LABELS[scenario]} | Chrome: {chromeMode.toUpperCase()}
               {initialPage != null ? ` | Page: ${initialPage}` : ""} | {status}

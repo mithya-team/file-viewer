@@ -38,9 +38,11 @@ export interface PdfRendererProps {
   blob: Blob;
   page: number;
   pageCount: number;
+  navIntent?: number;
   zoom: number;
   onError: (error: Error) => void;
   onPageCountChange: (pageCount: number) => void;
+  onGeometryReadyChange?: (ready: boolean) => void;
   onVisiblePageChange?: (page: number) => void;
   onProgrammaticPageNavigateSettled?: (page: number) => void;
   searchQuery?: string;
@@ -84,9 +86,11 @@ async function loadPdfDocument(blob: Blob): Promise<PDFDocumentProxy> {
 export function PdfRenderer({
   blob,
   page,
+  navIntent = 0,
   zoom,
   onError,
   onPageCountChange,
+  onGeometryReadyChange,
   onVisiblePageChange,
   onProgrammaticPageNavigateSettled,
   searchQuery = "",
@@ -108,11 +112,13 @@ export function PdfRenderer({
 
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
+  const onGeometryReadyChangeRef = useRef(onGeometryReadyChange);
   const onSearchStateChangeRef = useRef(onSearchStateChange);
   const onRequestPageForSearchRef = useRef(onRequestPageForSearch);
 
   onErrorRef.current = onError;
   onPageCountChangeRef.current = onPageCountChange;
+  onGeometryReadyChangeRef.current = onGeometryReadyChange;
   onSearchStateChangeRef.current = onSearchStateChange;
   onRequestPageForSearchRef.current = onRequestPageForSearch;
 
@@ -142,6 +148,7 @@ export function PdfRenderer({
     numPages,
     isDocumentLoading,
     page,
+    navIntent,
     layoutKey: zoom,
     onVisiblePageChange,
     onPageNearViewport: (pageNum) => {
@@ -289,6 +296,7 @@ export function PdfRenderer({
     setPdfDocument(null);
     setNumPages(0);
     setPageSizes(new Map());
+    onGeometryReadyChangeRef.current?.(false);
     renderedScaleRef.current.clear();
     renderingRef.current.clear();
     setSearchMatches([]);
@@ -316,6 +324,7 @@ export function PdfRenderer({
         }
         if (!active) return;
         setPageSizes(sizes);
+        onGeometryReadyChangeRef.current?.(true);
       })
       .catch((error) => {
         if (!active) return;
@@ -326,6 +335,7 @@ export function PdfRenderer({
       active = false;
       setPdfDocument(null);
       pdfDocRef.current = null;
+      onGeometryReadyChangeRef.current?.(false);
       if (loadedDocument != null) {
         void loadedDocument.destroy();
       }

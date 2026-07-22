@@ -238,6 +238,9 @@ Notes:
 - images expose `api.image.zoom`, toolbar `zoomIn` / `zoomOut` (±10%, clamped 40–200%), `setZoom`, `stepZoomIn` (sequential click steps), and `resetZoom` (100%)
 - multi-page TIFF also exposes `api.image.page`, `pageCount`, `prevPage`, `nextPage`, `setPage`, and `subscribePageNavigate` (scroll-synced, same model as PDF)
 - PDF / PPTX / multi-page TIFF: `setPage` smooth-scrolls using page geometry; `subscribePageNavigate(listener)` fires `{ page, reason: "programmatic" }` when that navigation settles (not on user scroll). Unsubscribe with the returned function.
+- `pageCount` starts at `0` until the document reports pages. Early `setPage(N)` is queued and applied when the count is known (not clamped to page 1).
+- Every `setPage` re-triggers navigation even if the page is unchanged (same-citation re-jump).
+- `geometryReady` on `pdf` / `pptx` / `image` is `true` when scroll geometry for programmatic jumps is available.
 - Pass a **stable** custom `chrome` component type (module-level or `useCallback`-stable). Recreating the component type each render remounts the toolbar.
 - TIFF pages are decoded lazily near the viewport; download uses the original TIFF bytes
 - with `chrome="none"`, single-click step zoom and double-click reset still work on the native image viewport (not on TIFF scroll pages)

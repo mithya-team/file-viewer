@@ -43,7 +43,8 @@ function sourceTypeOf(source: FileViewerProps["source"]): "string" | "blob" | "s
 }
 
 function setPageWithinBounds(page: number, pageCount: number) {
-  return Math.min(Math.max(page, 1), Math.max(pageCount, 1));
+  if (pageCount < 1) return Math.max(1, page);
+  return Math.min(Math.max(page, 1), pageCount);
 }
 
 async function resolveViewerState(source: FileViewerProps["source"], signal: AbortSignal) {
@@ -76,12 +77,15 @@ function createChromeApi({
   downloadUrl,
   pdfPage,
   pdfPageCount,
+  pdfGeometryReady,
   pdfZoom,
   imageZoom,
   imagePage,
   imagePageCount,
+  imageGeometryReady,
   pptxPage,
   pptxPageCount,
+  pptxGeometryReady,
   pptxZoom,
   sheetNames,
   activeSheetIndex,
@@ -100,12 +104,15 @@ function createChromeApi({
   downloadUrl: string | null;
   pdfPage: number;
   pdfPageCount: number;
+  pdfGeometryReady: boolean;
   pdfZoom: number;
   imageZoom: number;
   imagePage: number;
   imagePageCount: number;
+  imageGeometryReady: boolean;
   pptxPage: number;
   pptxPageCount: number;
+  pptxGeometryReady: boolean;
   pptxZoom: number;
   sheetNames: string[];
   activeSheetIndex: number;
@@ -137,6 +144,7 @@ function createChromeApi({
           resetZoom: () => setImageZoom(DEFAULT_IMAGE_ZOOM),
           page: imagePage,
           pageCount: imagePageCount,
+          geometryReady: imageGeometryReady,
           canPrev: imagePage > 1,
           canNext: imagePage < imagePageCount,
           prevPage: () => setImagePage(imagePage - 1),
@@ -155,6 +163,7 @@ function createChromeApi({
         pdf: {
           page: pdfPage,
           pageCount: pdfPageCount,
+          geometryReady: pdfGeometryReady,
           zoom: pdfZoom,
           canPrev: pdfPage > 1,
           canNext: pdfPage < pdfPageCount,
@@ -201,6 +210,7 @@ function createChromeApi({
         pptx: {
           page: pptxPage,
           pageCount: pptxPageCount,
+          geometryReady: pptxGeometryReady,
           zoom: pptxZoom,
           canPrev: pptxPage > 1,
           canNext: pptxPage < pptxPageCount,
@@ -264,18 +274,33 @@ export function FileViewer({
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<Error | null>(null);
   const [pdfPage, setPdfPage] = useState(1);
-  const [pdfPageCount, setPdfPageCount] = useState(1);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+  const [pdfNavIntent, setPdfNavIntent] = useState(0);
+  const [pdfGeometryReady, setPdfGeometryReady] = useState(false);
   const [pdfZoom, setPdfZoom] = useState(100);
   const [imageZoom, setImageZoom] = useState(DEFAULT_IMAGE_ZOOM);
   const [imagePage, setImagePage] = useState(1);
-  const [imagePageCount, setImagePageCount] = useState(1);
+  const [imagePageCount, setImagePageCount] = useState(0);
+  const [imageNavIntent, setImageNavIntent] = useState(0);
+  const [imageGeometryReady, setImageGeometryReady] = useState(false);
   const [pptxPage, setPptxPage] = useState(1);
-  const [pptxPageCount, setPptxPageCount] = useState(1);
+  const [pptxPageCount, setPptxPageCount] = useState(0);
+  const [pptxNavIntent, setPptxNavIntent] = useState(0);
+  const [pptxGeometryReady, setPptxGeometryReady] = useState(false);
   const [pptxZoom, setPptxZoom] = useState(100);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState(0);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const pdfPendingPageRef = useRef<number | null>(null);
+  const imagePendingPageRef = useRef<number | null>(null);
+  const pptxPendingPageRef = useRef<number | null>(null);
+  const pdfPageCountRef = useRef(pdfPageCount);
+  const imagePageCountRef = useRef(imagePageCount);
+  const pptxPageCountRef = useRef(pptxPageCount);
+  pdfPageCountRef.current = pdfPageCount;
+  imagePageCountRef.current = imagePageCount;
+  pptxPageCountRef.current = pptxPageCount;
   const pdfPageNavigateListenersRef = useRef(new Set<PageNavigateListener>());
   const imagePageNavigateListenersRef = useRef(new Set<PageNavigateListener>());
   const pptxPageNavigateListenersRef = useRef(new Set<PageNavigateListener>());
@@ -321,29 +346,60 @@ export function FileViewer({
   useEffect(() => {
     setRenderError(null);
     setPdfPage(1);
-    setPdfPageCount(1);
+    setPdfPageCount(0);
+    setPdfNavIntent(0);
+    setPdfGeometryReady(false);
+    pdfPendingPageRef.current = null;
     setPdfZoom(100);
     setImageZoom(DEFAULT_IMAGE_ZOOM);
     setImagePage(1);
-    setImagePageCount(1);
+    setImagePageCount(0);
+    setImageNavIntent(0);
+    setImageGeometryReady(false);
+    imagePendingPageRef.current = null;
     setPptxPage(1);
-    setPptxPageCount(1);
+    setPptxPageCount(0);
+    setPptxNavIntent(0);
+    setPptxGeometryReady(false);
+    pptxPendingPageRef.current = null;
     setPptxZoom(100);
     setSheetNames([]);
     setActiveSheetIndex(0);
   }, [source]);
 
   useEffect(() => {
-    setPdfPage((current) => setPageWithinBounds(current, pdfPageCount));
+    if (pdfPageCount < 1) return;
+    const pending = pdfPendingPageRef.current;
+    pdfPendingPageRef.current = null;
+    setPdfPage((current) => setPageWithinBounds(pending ?? current, pdfPageCount));
   }, [pdfPageCount]);
 
   useEffect(() => {
-    setImagePage((current) => setPageWithinBounds(current, imagePageCount));
+    if (imagePageCount < 1) return;
+    const pending = imagePendingPageRef.current;
+    imagePendingPageRef.current = null;
+    setImagePage((current) => setPageWithinBounds(pending ?? current, imagePageCount));
   }, [imagePageCount]);
 
   useEffect(() => {
-    setPptxPage((current) => setPageWithinBounds(current, pptxPageCount));
+    if (pptxPageCount < 1) return;
+    const pending = pptxPendingPageRef.current;
+    pptxPendingPageRef.current = null;
+    setPptxPage((current) => setPageWithinBounds(pending ?? current, pptxPageCount));
   }, [pptxPageCount]);
+
+  useEffect(() => {
+    if (state.status !== "ready") return;
+    if (state.detection.kind === "image" && !isTiffDetection(state.detection)) {
+      setImagePageCount(1);
+      setImageGeometryReady(true);
+    }
+  }, [state]);
+
+  const readyDetectionKind = state.status === "ready" ? state.detection.kind : null;
+  useEffect(() => {
+    if (readyDetectionKind == null) return;
+  }, [readyDetectionKind]);
 
   useEffect(() => {
     setRenderError(null);
@@ -426,6 +482,39 @@ export function FileViewer({
     });
   }
 
+  function requestPdfPage(page: number) {
+    setPdfNavIntent((intent) => intent + 1);
+    if (pdfPageCountRef.current < 1) {
+      pdfPendingPageRef.current = page;
+      setPdfPage(Math.max(1, page));
+      return;
+    }
+    pdfPendingPageRef.current = null;
+    setPdfPage(setPageWithinBounds(page, pdfPageCountRef.current));
+  }
+
+  function requestImagePage(page: number) {
+    setImageNavIntent((intent) => intent + 1);
+    if (imagePageCountRef.current < 1) {
+      imagePendingPageRef.current = page;
+      setImagePage(Math.max(1, page));
+      return;
+    }
+    imagePendingPageRef.current = null;
+    setImagePage(setPageWithinBounds(page, imagePageCountRef.current));
+  }
+
+  function requestPptxPage(page: number) {
+    setPptxNavIntent((intent) => intent + 1);
+    if (pptxPageCountRef.current < 1) {
+      pptxPendingPageRef.current = page;
+      setPptxPage(Math.max(1, page));
+      return;
+    }
+    pptxPendingPageRef.current = null;
+    setPptxPage(setPageWithinBounds(page, pptxPageCountRef.current));
+  }
+
   const chromeApi = useMemo(() => {
     if (state.status !== "ready" && state.status !== "unsupported") return null;
     return createChromeApi({
@@ -433,21 +522,24 @@ export function FileViewer({
       downloadUrl: state.status === "ready" ? downloadUrl : null,
       pdfPage,
       pdfPageCount,
+      pdfGeometryReady,
       pdfZoom,
       imageZoom,
       imagePage,
       imagePageCount,
+      imageGeometryReady,
       pptxPage,
       pptxPageCount,
+      pptxGeometryReady,
       pptxZoom,
       sheetNames,
       activeSheetIndex,
       setActiveSheetIndex,
-      setPdfPage: (page) => setPdfPage(setPageWithinBounds(page, pdfPageCount)),
+      setPdfPage: requestPdfPage,
       setPdfZoom: (zoom) => setPdfZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
       setImageZoom: (zoom) => setImageZoom(clampImageZoom(zoom)),
-      setImagePage: (page) => setImagePage(setPageWithinBounds(page, imagePageCount)),
-      setPptxPage: (page) => setPptxPage(setPageWithinBounds(page, pptxPageCount)),
+      setImagePage: requestImagePage,
+      setPptxPage: requestPptxPage,
       setPptxZoom: (zoom) => setPptxZoom(Math.min(Math.max(zoom, MIN_PDF_ZOOM), MAX_PDF_ZOOM)),
       subscribePdfPageNavigate,
       subscribeImagePageNavigate,
@@ -456,13 +548,16 @@ export function FileViewer({
   }, [
     activeSheetIndex,
     downloadUrl,
+    imageGeometryReady,
     imagePage,
     imagePageCount,
     objectUrl,
+    pdfGeometryReady,
     pdfPage,
     pdfPageCount,
     pdfZoom,
     imageZoom,
+    pptxGeometryReady,
     pptxPage,
     pptxPageCount,
     pptxZoom,
@@ -499,9 +594,11 @@ export function FileViewer({
         <TiffRenderer
           blob={state.blob}
           page={imagePage}
+          navIntent={imageNavIntent}
           zoom={imageZoom}
           onError={handleRenderError}
           onPageCountChange={setImagePageCount}
+          onGeometryReadyChange={setImageGeometryReady}
           onVisiblePageChange={(visiblePage) =>
             setImagePage(setPageWithinBounds(visiblePage, imagePageCount))
           }
@@ -534,9 +631,11 @@ export function FileViewer({
           blob={state.blob}
           page={pdfPage}
           pageCount={pdfPageCount}
+          navIntent={pdfNavIntent}
           zoom={pdfZoom}
           onError={handleRenderError}
           onPageCountChange={setPdfPageCount}
+          onGeometryReadyChange={setPdfGeometryReady}
           onVisiblePageChange={(visiblePage) =>
             setPdfPage(setPageWithinBounds(visiblePage, pdfPageCount))
           }
@@ -550,9 +649,11 @@ export function FileViewer({
         <PptxRenderer
           blob={state.blob}
           page={pptxPage}
+          navIntent={pptxNavIntent}
           zoom={pptxZoom}
           onError={handleRenderError}
           onPageCountChange={setPptxPageCount}
+          onGeometryReadyChange={setPptxGeometryReady}
           onVisiblePageChange={(visiblePage) =>
             setPptxPage(setPageWithinBounds(visiblePage, pptxPageCount))
           }

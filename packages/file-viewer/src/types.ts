@@ -49,6 +49,7 @@ export type ImageChromeApi = {
     resetZoom: () => void;
     page: number;
     pageCount: number;
+    geometryReady: boolean;
     canPrev: boolean;
     canNext: boolean;
     prevPage: () => void;
@@ -63,6 +64,7 @@ export type PDFChromeApi = {
   pdf: {
     page: number;
     pageCount: number;
+    geometryReady: boolean;
     zoom: number;
     canPrev: boolean;
     canNext: boolean;
@@ -94,6 +96,7 @@ export type PptxChromeApi = {
   pptx: {
     page: number;
     pageCount: number;
+    geometryReady: boolean;
     zoom: number;
     canPrev: boolean;
     canNext: boolean;

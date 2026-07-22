@@ -13,9 +13,11 @@ import { usePaginatedScrollStack } from "./usePaginatedScrollStack";
 export interface PptxRendererProps {
   blob: Blob;
   page: number;
+  navIntent?: number;
   zoom: number;
   onError: (error: Error) => void;
   onPageCountChange: (pageCount: number) => void;
+  onGeometryReadyChange?: (ready: boolean) => void;
   onVisiblePageChange?: (page: number) => void;
   onProgrammaticPageNavigateSettled?: (page: number) => void;
 }
@@ -40,9 +42,11 @@ function normalizeRenderError(error: unknown): Error {
 export function PptxRenderer({
   blob,
   page,
+  navIntent = 0,
   zoom,
   onError,
   onPageCountChange,
+  onGeometryReadyChange,
   onVisiblePageChange,
   onProgrammaticPageNavigateSettled,
 }: PptxRendererProps) {
@@ -53,8 +57,10 @@ export function PptxRenderer({
 
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
+  const onGeometryReadyChangeRef = useRef(onGeometryReadyChange);
   onErrorRef.current = onError;
   onPageCountChangeRef.current = onPageCountChange;
+  onGeometryReadyChangeRef.current = onGeometryReadyChange;
 
   const [numPages, setNumPages] = useState(0);
   const [slotState, setSlotState] = useState<Map<number, PageSlotState>>(new Map());
@@ -127,6 +133,7 @@ export function PptxRenderer({
     renderingRef.current.clear();
     presentationRef.current = null;
     fontSubstitutesRef.current = {};
+    onGeometryReadyChangeRef.current?.(false);
 
     void blob
       .arrayBuffer()
@@ -148,6 +155,8 @@ export function PptxRenderer({
         setNumPages(presentation.slides.length);
         onPageCountChangeRef.current(presentation.slides.length);
         setIsDocumentLoading(false);
+        // Placeholder heights always yield scroll tops once slide count is known.
+        onGeometryReadyChangeRef.current?.(true);
       })
       .catch((error) => {
         if (!active) return;
@@ -158,6 +167,7 @@ export function PptxRenderer({
       active = false;
       slideCacheRef.current.clear();
       renderingRef.current.clear();
+      onGeometryReadyChangeRef.current?.(false);
     };
   }, [blob]);
 
@@ -177,6 +187,7 @@ export function PptxRenderer({
     numPages,
     isDocumentLoading,
     page,
+    navIntent,
     layoutKey: zoom,
     onVisiblePageChange,
     onPageNearViewport: renderSlideSlot,
