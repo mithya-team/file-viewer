@@ -133,14 +133,17 @@ Current limits:
 
 Renderer selection uses:
 
-1. magic bytes
-2. loaded `Blob.type` or HTTP `Content-Type`
+1. unique binary magic (PDF, images, TIFF, OLE)
+2. specific loaded `Blob.type` or HTTP `Content-Type` (not generic empty / `octet-stream` / `zip` / `x-zip-compressed`)
+3. OpenXML package-root zip entry sniff (`ppt/` / `word/` / `xl/`)
+4. remaining MIME paths (markdown, HTML, textual types)
 
 It does not use:
 
 - filename extensions
 - consumer-provided MIME props
 - text/CSV content heuristics
+- raw substring matches inside nested zip member payloads
 
 Examples:
 

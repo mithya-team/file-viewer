@@ -20,11 +20,92 @@ function decodeUtf8(bytes: Uint8Array): string | null {
   }
 }
 
+const ZIP_LOCAL_HEADER = [0x50, 0x4b, 0x03, 0x04] as const;
+const GENERIC_MIME = new Set([
+  "",
+  "application/octet-stream",
+  "application/zip",
+  "application/x-zip-compressed",
+]);
+
+function isGenericMime(mime: string): boolean {
+  return GENERIC_MIME.has(mime);
+}
+
+function collectZipLocalEntryNames(bytes: Uint8Array): string[] {
+  const names: string[] = [];
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 0;
+
+  while (offset + 30 <= bytes.length) {
+    if (!startsWith(bytes.subarray(offset), [...ZIP_LOCAL_HEADER])) {
+      break;
+    }
+
+    const generalPurpose = view.getUint16(offset + 6, true);
+    const compressedSize = view.getUint32(offset + 18, true);
+    const fileNameLength = view.getUint16(offset + 26, true);
+    const extraLength = view.getUint16(offset + 28, true);
+    const nameStart = offset + 30;
+    const nameEnd = nameStart + fileNameLength;
+    if (nameEnd > bytes.length) {
+      break;
+    }
+
+    names.push(new TextDecoder("utf-8").decode(bytes.subarray(nameStart, nameEnd)));
+
+    const dataStart = nameEnd + extraLength;
+    const usesDataDescriptor = (generalPurpose & 0x8) !== 0;
+    if (!usesDataDescriptor || compressedSize > 0) {
+      offset = dataStart + compressedSize;
+      continue;
+    }
+
+    let search = dataStart;
+    let found = -1;
+    while (search + 4 <= bytes.length) {
+      if (
+        bytes[search] === 0x50
+        && bytes[search + 1] === 0x4b
+        && bytes[search + 2] === 0x03
+        && bytes[search + 3] === 0x04
+      ) {
+        found = search;
+        break;
+      }
+      // Central directory / end of central directory — stop walking locals
+      if (
+        bytes[search] === 0x50
+        && bytes[search + 1] === 0x4b
+        && (bytes[search + 2] === 0x01 || bytes[search + 2] === 0x05)
+        && (bytes[search + 3] === 0x02 || bytes[search + 3] === 0x06)
+      ) {
+        return names;
+      }
+      search += 1;
+    }
+    if (found < 0) {
+      break;
+    }
+    offset = found;
+  }
+
+  return names;
+}
+
 function inferOpenXmlKind(bytes: Uint8Array): "spreadsheet" | "docx" | "pptx" | null {
-  const latin1 = new TextDecoder("latin1").decode(bytes);
-  if (latin1.includes("xl/")) return "spreadsheet";
-  if (latin1.includes("word/")) return "docx";
-  if (latin1.includes("ppt/")) return "pptx";
+  const names = collectZipLocalEntryNames(bytes);
+  let hasPpt = false;
+  let hasWord = false;
+  let hasXl = false;
+  for (const name of names) {
+    if (name.startsWith("ppt/")) hasPpt = true;
+    else if (name.startsWith("word/")) hasWord = true;
+    else if (name.startsWith("xl/")) hasXl = true;
+  }
+  if (hasPpt) return "pptx";
+  if (hasWord) return "docx";
+  if (hasXl) return "spreadsheet";
   return null;
 }
 
@@ -76,6 +157,44 @@ const PPTX_MIME = new Set([
   "application/vnd.openxmlformats-officedocument.presentationml.template",
 ]);
 
+function mapSpecificBinaryMime(mime: string): DetectionResult | null {
+  if (mime.startsWith(IMAGE_MIME_PREFIX)) {
+    return { kind: "image", mimeType: mime };
+  }
+  if (mime === "application/pdf") {
+    return { kind: "pdf", mimeType: mime };
+  }
+  if (DOCX_MIME.has(mime)) {
+    return { kind: "docx", mimeType: mime };
+  }
+  if (PPTX_MIME.has(mime)) {
+    return { kind: "pptx", mimeType: mime };
+  }
+  if (SPREADSHEET_MIME.has(mime)) {
+    return { kind: "spreadsheet", mimeType: mime };
+  }
+  return null;
+}
+
+function mapTextualMime(mime: string, sampleBytes: Uint8Array): DetectionResult | null {
+  if (MARKDOWN_MIME.has(mime) && isProbablyText(sampleBytes)) {
+    return { kind: "markdown", mimeType: mime };
+  }
+  if (mime === HTML_MIME && isProbablyText(sampleBytes)) {
+    return { kind: "html", mimeType: mime };
+  }
+  if (
+    (TEXTUAL_MIME.has(mime) || mime.startsWith("text/"))
+    && !MARKDOWN_MIME.has(mime)
+    && mime !== HTML_MIME
+    && !SPREADSHEET_MIME.has(mime)
+    && isProbablyText(sampleBytes)
+  ) {
+    return { kind: "text", mimeType: mime };
+  }
+  return null;
+}
+
 export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
   const sampleLength = Math.min(blob.size, 1024 * 256);
   const sampleBuffer = await blob.slice(0, sampleLength).arrayBuffer();
@@ -120,41 +239,24 @@ export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
     }
     return { kind: "unsupported", mimeType: normalizedMime || "application/octet-stream" };
   }
-  if (startsWith(sampleBytes, [0x50, 0x4b, 0x03, 0x04])) {
+
+  if (!isGenericMime(normalizedMime)) {
+    const fromSpecificMime = mapSpecificBinaryMime(normalizedMime);
+    if (fromSpecificMime != null) {
+      return fromSpecificMime;
+    }
+  }
+
+  if (startsWith(sampleBytes, [...ZIP_LOCAL_HEADER])) {
     const openXmlKind = inferOpenXmlKind(sampleBytes);
     if (openXmlKind != null) {
       return { kind: openXmlKind, mimeType: normalizedMime || "application/zip" };
     }
   }
 
-  if (normalizedMime.startsWith(IMAGE_MIME_PREFIX)) {
-    return { kind: "image", mimeType: normalizedMime };
-  }
-  if (normalizedMime === "application/pdf") {
-    return { kind: "pdf", mimeType: normalizedMime };
-  }
-  if (DOCX_MIME.has(normalizedMime)) {
-    return { kind: "docx", mimeType: normalizedMime };
-  }
-  if (PPTX_MIME.has(normalizedMime)) {
-    return { kind: "pptx", mimeType: normalizedMime };
-  }
-  if (SPREADSHEET_MIME.has(normalizedMime)) {
-    return { kind: "spreadsheet", mimeType: normalizedMime };
-  }
-  if (MARKDOWN_MIME.has(normalizedMime) && isProbablyText(sampleBytes)) {
-    return { kind: "markdown", mimeType: normalizedMime };
-  }
-  if (normalizedMime === HTML_MIME && isProbablyText(sampleBytes)) {
-    return { kind: "html", mimeType: normalizedMime };
-  }
-  if (
-    (TEXTUAL_MIME.has(normalizedMime) || normalizedMime.startsWith("text/"))
-    && !MARKDOWN_MIME.has(normalizedMime)
-    && normalizedMime !== HTML_MIME
-    && isProbablyText(sampleBytes)
-  ) {
-    return { kind: "text", mimeType: normalizedMime };
+  const fromTextualMime = mapTextualMime(normalizedMime, sampleBytes);
+  if (fromTextualMime != null) {
+    return fromTextualMime;
   }
 
   return { kind: "unsupported", mimeType: normalizedMime || "application/octet-stream" };

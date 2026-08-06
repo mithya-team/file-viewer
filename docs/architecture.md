@@ -81,8 +81,10 @@ All sources are loaded to `Blob` before renderer selection. URLs and streams are
 
 Renderer selection depends on loaded data:
 
-1. Magic byte sniffing
-2. Loaded `Blob.type` or HTTP `Content-Type`
+1. Unique binary magic (PDF, images, TIFF, OLE)
+2. Specific loaded `Blob.type` or HTTP `Content-Type` (not generic: empty / `octet-stream` / `zip` / `x-zip-compressed`)
+3. OpenXML package-root zip entry sniff (`ppt/` / `word/` / `xl/`)
+4. Remaining MIME paths (markdown, HTML, textual types)
 
 Filename extensions, consumer-provided MIME values, and text/CSV heuristics are not renderer-selection inputs.
 

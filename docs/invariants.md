@@ -25,8 +25,11 @@ This file details what not to do when building this library/package.
 ## MIME And Renderer Selection
 
 - Must select renderers from loaded data, not consumer intent.
-- Must prefer magic-byte sniffing over headers.
-- Must use loaded `Blob.type` or HTTP `Content-Type` only after sniffing.
+- Must apply unique binary magic first (PDF, JPEG/PNG/GIF/WebP, classical TIFF, OLE).
+- Must trust **specific** loaded `Blob.type` / HTTP `Content-Type` next when it maps to a known kind (Office, PDF, image, and similar).
+- Must treat **generic** MIME as non-authoritative: empty, `application/octet-stream`, `application/zip`, `application/x-zip-compressed` — sniff instead.
+- Must classify OpenXML PK zips from outer zip **entry-name** prefixes (`ppt/`, `word/`, `xl/`), not raw byte substrings inside embeds.
+- Must use remaining MIME paths (markdown, HTML, textual types) after sniff miss, with existing text guards.
 - Must not fall back to text, CSV, or other content heuristics for renderer selection.
 - Must not use filename extensions to select renderers.
 - Must not use consumer-provided MIME props to select renderers.
@@ -36,7 +39,7 @@ This file details what not to do when building this library/package.
 ## Format Scope
 
 - Must support images, `xlsx`, `xls`, `csv`, `pdf`, `docx`, `dotx`, `pptx`, `potx`, text files, markdown (`text/markdown`, `text/x-markdown`), and HTML (`text/html`).
-- Must treat `txt`, `csv`, markdown, and HTML support as detection through loaded MIME/header data after sniffing, not as unlabeled content-heuristic or extension routing.
+- Must treat `txt`, `csv`, markdown, and HTML support as detection through loaded MIME/header data (after unique magic and OpenXML sniff where applicable), not as unlabeled content-heuristic or extension routing.
 - Must render markdown through an internal `MarkdownRenderer` with GFM + sanitization (static preview by default). Shell MUST expose Preview | Source via chrome (`markdown.viewMode` / `setViewMode`); Source MUST mount the text renderer (plain monospace).
 - Must detect `text/html` as `html` kind; HTML iframe preview MUST be opt-in via `enableHtmlPreview` (default false). When disabled, HTML MUST fall back to the text renderer with no Preview | Source toggle. When enabled, MUST use a sandboxed iframe with `allow-scripts` and without `allow-same-origin` for Preview, expose optional `html.viewMode` / `setViewMode`, and allow Source via the text renderer. Flipping `enableHtmlPreview` to false MUST force the text path and drop the toggle. MUST NOT treat `application/xhtml+xml` as HTML in v1.
 - Must render `dotx` through the DOCX path only.

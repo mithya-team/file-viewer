@@ -18,11 +18,11 @@ Consequence: Ambiguous strings are handled best-effort. Rendering still depends 
 
 ### 3. Renderer Selection Is Content-Driven
 
-Decision: Renderer selection uses loaded data: magic bytes first, loaded `Blob.type` or HTTP `Content-Type` second.
+Decision: Renderer selection uses loaded data in this order: (1) unique binary magic; (2) specific loaded `Blob.type` / HTTP `Content-Type` when it maps to a known kind; (3) OpenXML package-root zip entry sniff (and other soft sniff); (4) remaining MIME paths (text/markdown/HTML/CSV) with guards. Generic MIME (`""`, `application/octet-stream`, `application/zip`, `application/x-zip-compressed`) is not authoritative.
 
-Rationale: Consumers should not be able to force the wrong renderer with props or filenames, and unsupported data should fail closed instead of being guessed into text or CSV.
+Rationale: Unique signatures fail closed against absurd MIME. PK/OpenXML is a weak shared container — specific Office MIME must beat flawed path sniff (e.g. chart embeds containing nested `xl/`). Consumers still cannot force renderers via props or filenames.
 
-Consequence: Filename extensions and consumer-provided MIME values are metadata only, not routing inputs. Text/CSV heuristics are not routing inputs either.
+Consequence: Filename extensions and consumer-provided MIME props stay metadata only. Wrong specific MIME is trusted (accepted product trade-off). Text/CSV content heuristics are not routing inputs.
 
 ### 4. All Sources Buffer Before Rendering
 

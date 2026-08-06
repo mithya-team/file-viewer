@@ -1,9 +1,48 @@
 import { describe, expect, it } from "vitest";
 import { detectFileKind } from "../src/detect/detectFileKind";
 
+function zipEntries(entries: Array<{ name: string; data?: string | Uint8Array }>): Uint8Array {
+  const parts: Uint8Array[] = [];
+  for (const entry of entries) {
+    const nameBytes = new TextEncoder().encode(entry.name);
+    const dataBytes =
+      typeof entry.data === "string"
+        ? new TextEncoder().encode(entry.data)
+        : (entry.data ?? new Uint8Array(0));
+    const header = new Uint8Array(30 + nameBytes.length + dataBytes.length);
+    const view = new DataView(header.buffer);
+    header[0] = 0x50;
+    header[1] = 0x4b;
+    header[2] = 0x03;
+    header[3] = 0x04;
+    view.setUint32(18, dataBytes.length, true);
+    view.setUint32(22, dataBytes.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    header.set(nameBytes, 30);
+    header.set(dataBytes, 30 + nameBytes.length);
+    parts.push(header);
+  }
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
 describe("detectFileKind", () => {
   it("detects pdf by magic bytes", async () => {
     const blob = new Blob([new Uint8Array([0x25, 0x50, 0x44, 0x46])], { type: "application/octet-stream" });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("pdf");
+  });
+
+  it("detects pdf magic over wrong image MIME", async () => {
+    const blob = new Blob([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34])], {
+      type: "image/png",
+    });
     const result = await detectFileKind(blob);
     expect(result.kind).toBe("pdf");
   });
@@ -35,11 +74,27 @@ describe("detectFileKind", () => {
   });
 
   it("detects dotx through the docx path", async () => {
-    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "word/document.xml"], {
+    const blob = new Blob([zipEntries([{ name: "word/document.xml" }])], {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
     });
     const result = await detectFileKind(blob);
     expect(result.kind).toBe("docx");
+  });
+
+  it("detects docx from package-root entry names", async () => {
+    const blob = new Blob([zipEntries([{ name: "word/document.xml" }])], {
+      type: "application/zip",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("docx");
+  });
+
+  it("detects spreadsheet from package-root xl/ entries", async () => {
+    const blob = new Blob([zipEntries([{ name: "xl/workbook.xml" }])], {
+      type: "application/zip",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("spreadsheet");
   });
 
   it("does not treat arbitrary OLE data as spreadsheet", async () => {
@@ -69,7 +124,7 @@ describe("detectFileKind", () => {
   });
 
   it("detects pptx by ppt/ path in zip sample", async () => {
-    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "ppt/slides/slide1.xml"], {
+    const blob = new Blob([zipEntries([{ name: "ppt/slides/slide1.xml" }])], {
       type: "application/zip",
     });
     const result = await detectFileKind(blob);
@@ -77,7 +132,7 @@ describe("detectFileKind", () => {
   });
 
   it("detects potx through the pptx path", async () => {
-    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "ppt/presentation.xml"], {
+    const blob = new Blob([zipEntries([{ name: "ppt/presentation.xml" }])], {
       type: "application/vnd.openxmlformats-officedocument.presentationml.template",
     });
     const result = await detectFileKind(blob);
@@ -88,6 +143,44 @@ describe("detectFileKind", () => {
     const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], {
       type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("pptx");
+  });
+
+  it("keeps pptx when chart embed payload contains xl/ (generic MIME)", async () => {
+    const bytes = zipEntries([
+      { name: "ppt/slides/slide1.xml", data: "<p:sld/>" },
+      {
+        name: "ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx",
+        data: "PK fake xl/workbook.xml inside embed",
+      },
+    ]);
+    const blob = new Blob([bytes], { type: "application/zip" });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("pptx");
+  });
+
+  it("keeps pptx when chart embed payload contains xl/ (presentation MIME)", async () => {
+    const bytes = zipEntries([
+      { name: "ppt/slides/slide1.xml", data: "<p:sld/>" },
+      {
+        name: "ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx",
+        data: "PK fake xl/workbook.xml inside embed",
+      },
+    ]);
+    const blob = new Blob([bytes], {
+      type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    });
+    const result = await detectFileKind(blob);
+    expect(result.kind).toBe("pptx");
+  });
+
+  it("prefers ppt/ over xl/ when both are outer entry roots", async () => {
+    const bytes = zipEntries([
+      { name: "ppt/presentation.xml" },
+      { name: "xl/workbook.xml" },
+    ]);
+    const blob = new Blob([bytes], { type: "application/octet-stream" });
     const result = await detectFileKind(blob);
     expect(result.kind).toBe("pptx");
   });
@@ -157,7 +250,7 @@ describe("detectFileKind", () => {
   });
 
   it("does not treat unknown zip payloads as supported openxml formats", async () => {
-    const blob = new Blob([new Uint8Array([0x50, 0x4b, 0x03, 0x04]), "custom/content.xml"], {
+    const blob = new Blob([zipEntries([{ name: "custom/content.xml" }])], {
       type: "application/zip",
     });
     const result = await detectFileKind(blob);
