@@ -1,15 +1,6 @@
+import { ReactDocxViewer, useDocxModel } from "@extend-ai/react-docx";
 import { useEffect, useRef, useState } from "react";
-import { renderAsync } from "docx-preview";
 import { ViewerStatus } from "../primitives/ViewerStatus";
-import {
-  correctDocxPreviewLayout,
-  scheduleCorrectionAfterImagesLoaded,
-} from "./docx/correctDocxPreviewLayout";
-import {
-  applyDocxDrawingLayers,
-  extractDocxDrawingLayers,
-  type DocxDrawingLayer,
-} from "./docx/docxDrawingLayers";
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
 export interface DocxRendererProps {
@@ -17,60 +8,46 @@ export interface DocxRendererProps {
   onError: (error: Error) => void;
 }
 
+function normalizeRenderError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  return new Error("Failed to render DOCX/DOTX.");
+}
+
+/** Internal read-only Extend DOCX adapter over FileViewer's buffered source. */
 export function DocxRenderer({ blob, onError }: DocxRendererProps) {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const styleHostRef = useRef<HTMLDivElement | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [file, setFile] = useState<ArrayBuffer | undefined>();
+  const { model, isLoading, error } = useDocxModel(file);
+  const lastErrorRef = useRef<Error | null>(null);
 
   useEffect(() => {
-    let active = true;
-    const host = hostRef.current;
-    const styleHost = styleHostRef.current;
-    if (host == null || styleHost == null) return;
-    host.replaceChildren();
-    styleHost.replaceChildren();
-    setIsLoading(true);
-    const finalizeLayout = (layers: DocxDrawingLayer[]) => {
-      correctDocxPreviewLayout(host);
-      applyDocxDrawingLayers(host, layers);
-    };
-
-    void Promise.all([
-      renderAsync(blob, host, styleHost, {
-        inWrapper: true,
-        breakPages: true,
-        ignoreLastRenderedPageBreak: true,
-      }),
-      extractDocxDrawingLayers(blob),
-    ])
-      .then(([, layers]) => {
-        if (!active) return;
-        finalizeLayout(layers);
-        scheduleCorrectionAfterImagesLoaded(
-          host,
-          () => active,
-          () => {
-            if (active) finalizeLayout(layers);
-          },
-        );
-        setIsLoading(false);
-      })
-      .catch(() => {
-        if (!active) return;
-        onError(new Error("Failed to render DOCX/DOTX."));
-      });
+    let disposed = false;
+    setFile(undefined);
+    void blob.arrayBuffer().then(
+      (buffer) => {
+        if (!disposed) setFile(buffer);
+      },
+      (readError) => {
+        if (!disposed) onError(normalizeRenderError(readError));
+      },
+    );
     return () => {
-      active = false;
+      disposed = true;
     };
   }, [blob, onError]);
 
+  useEffect(() => {
+    if (error == null || error === lastErrorRef.current) return;
+    lastErrorRef.current = error;
+    onError(normalizeRenderError(error));
+  }, [error, onError]);
+
+  if (file == null || isLoading || model == null) {
+    return <div className={RENDERER_VIEWPORT_CLASS}><ViewerStatus centered>Loading document...</ViewerStatus></div>;
+  }
+
   return (
-    <div
-      className={`${RENDERER_VIEWPORT_CLASS} p-4 [background-color:var(--file-viewer-surface-muted,_#f8fafc)]`}
-    >
-      {isLoading && <ViewerStatus>Rendering document...</ViewerStatus>}
-      <div ref={styleHostRef} className="hidden" aria-hidden />
-      <div ref={hostRef} />
+    <div className={`${RENDERER_VIEWPORT_CLASS} [background-color:var(--file-viewer-surface-muted,_#f8fafc)]`}>
+      <ReactDocxViewer model={model} />
     </div>
   );
 }

@@ -6,7 +6,7 @@
 
 | Layer | Role | Default appearance |
 |-------|------|--------------------|
-| **Canvas** (`z-0`) | Painted PDF pixels (pdf.js) | Visible page image |
+| **Canvas** (`z-0`) | Painted PDF pixels (EmbedPDF/PDFium) | Visible page image |
 | **Text layer** (`z-10`) | Selectable/searchable text | **Transparent** (`text-transparent` on spans) |
 
 In `apps/demo`, both work: you see the bitmap and can still select text.
@@ -109,7 +109,7 @@ Rules like `canvas { width: 100% !important; height: auto !important; }`, `max-w
 | Inline `style` | Intended CSS size |
 | **Rendered size** | Actual painted layout box—this is what “0×0” usually means |
 
-1190×1684 attributes + 595×842 styles + **0×0 rendered** → layout/CSS collapse, not a pdf.js viewport bug.
+1190×1684 attributes + 595×842 styles + **0×0 rendered** → layout/CSS collapse, not a PDF engine viewport bug.
 
 ## How to fix
 

@@ -32,13 +32,13 @@ Rationale: PDF, DOCX, and spreadsheet libraries generally need complete buffers 
 
 Consequence: True progressive rendering is out of scope for v1.
 
-### 5. PPTX Uses Pagus (Post-v1)
+### 5. Document Renderers Use Extend Primitives, Not Viewer Shells
 
-Decision: Use **[Pagus](https://github.com/pagus-kit/Pagus)** (`@pagus-kit/core`, `@pagus-kit/renderer`) as the OOXML engine for PPTX/POTX. Pin **`@pagus-kit/core@0.1.1`** and **`@pagus-kit/renderer@0.1.1`** until upgraded deliberately. Do not use `@pagus-kit/react`; the package owns chrome and mounts per-slide SVG from `renderSlide`.
+Decision: Use the pinned lower-level Extend rendering stack behind internal adapters: EmbedPDF `2.14.4` plus local `@embedpdf/pdfium`, `@extend-ai/react-docx@0.8.2`, `@extend-ai/react-xlsx@0.16.1`, and `@extend-ai/react-pptx@0.1.2`. Do not import an Extend UI registry viewer shell.
 
-Rationale: v1 scope excluded PPTX. Spike on `sample-files/*.pptx` showed Pagus beats alternatives on font fidelity, zoom/scaling, and SVG size for text-heavy slides. Pagus is MIT (FOSS).
+Rationale: FileViewer already owns source loading, routing, error state, downloads, and chrome. The lower-level primitives preserve that contract without adding a second toolbar, thumbnail rail, or design system.
 
-Consequence: Add an internal `PptxRenderer` + content-driven `pptx` detection without changing the public `FileViewer` API. Parse once per `Blob`, render slides lazily. Animations, editing, and presenter mode stay out of scope — static preview only.
+Consequence: PPTX/POTX remain static continuous previews with toolbar, thumbnails, notes, and diagnostics disabled. PDF/PPTX external `setPage` calls use the primitives' imperative scroll controls and preserve same-page/latest-request-wins settlement. XLSX uses the lower-level controller so FileViewer continues to own bidirectional sheet chrome; CSV is decoded to text then rendered in a client-only Papa Parse + Glide adapter.
 
 ### 6. DOTX Uses DOCX Rendering
 
@@ -98,11 +98,11 @@ Consequence: Do not import runtime UI components from `@mithya/ui-registry` or r
 
 ### 13. Workers Are Package-Owned
 
-Decision: PDF/spreadsheet workers are bundled as package-owned module workers.
+Decision: PDFium WASM is referenced from the installed PDFium package through a consumer-bundler asset URL; its engine worker and other renderer workers remain package-owned assets.
 
-Rationale: Consumers should not manually copy worker files into public assets.
+Rationale: Consumers should not manually copy worker files into public assets, and the PDF default must not need an external CDN in an air-gapped deployment.
 
-Consequence: The package targets bundlers that support `new URL(..., import.meta.url)` worker references.
+Consequence: The package targets bundlers that support Vite asset imports and package-relative module-worker references.
 
 ### 14. Demo App Lives In `apps/demo`
 

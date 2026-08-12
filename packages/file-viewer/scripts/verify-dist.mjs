@@ -1,6 +1,6 @@
 import { access, readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const packageDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const distDir = join(packageDir, "dist");
@@ -8,19 +8,33 @@ const distDir = join(packageDir, "dist");
 const requiredFiles = [
   join(distDir, "index.js"),
   join(distDir, "index.d.ts"),
+  join(distDir, "file-viewer-tailwind-content.html"),
 ];
 
 await Promise.all(requiredFiles.map((path) => access(path)));
+await import(pathToFileURL(join(distDir, "index.js")).href);
 
 const assetFiles = await readdir(join(distDir, "assets"));
-const workerAssetName = assetFiles.find((fileName) => /^pdf\.worker\.min-.*\.js$/.test(fileName));
-if (workerAssetName == null) {
-  throw new Error("Bundled PDF worker asset is missing from dist/assets.");
+await access(fileURLToPath(import.meta.resolve("@embedpdf/pdfium/pdfium.wasm")));
+if (!assetFiles.some((fileName) => fileName.endsWith(".css"))) {
+  throw new Error("Bundled renderer styles are missing from dist/assets.");
 }
 
-const bundleSource = await readFile(join(distDir, "index.js"), "utf8");
-if (!bundleSource.includes(`assets/${workerAssetName}`)) {
-  throw new Error("Bundled PDF worker reference is missing from dist/index.js.");
+const distFiles = await readdir(distDir);
+const bundleSources = await Promise.all(
+  distFiles
+    .filter((fileName) => fileName.endsWith(".js"))
+    .map((fileName) => readFile(join(distDir, fileName), "utf8")),
+);
+const bundleSource = bundleSources.join("\n");
+if (!bundleSource.includes("@embedpdf/pdfium/pdfium.wasm?url&no-inline")) {
+  throw new Error("Local PDFium WASM import is missing from the package output.");
+}
+if (!distFiles.some((fileName) => /^worker-engine-.*\.js$/.test(fileName))) {
+  throw new Error("Bundled EmbedPDF worker engine chunk is missing from dist.");
+}
+if (!bundleSource.includes("fontFallback: null")) {
+  throw new Error("EmbedPDF must disable remote fallback-font loading.");
 }
 
 if (bundleSource.includes("packages/file-viewer/src")) {
