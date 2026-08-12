@@ -27,6 +27,7 @@ const FILE_LABELS: Record<DemoFileType, string> = {
   docx: "DOCX",
   dotx: "DOTX",
   xlsx: "XLSX",
+  xlsxReport: "XLSX (report.xlsx)",
   pptx: "PPTX (sample-4)",
   pptx5: "PPTX (sample-5)",
 };
@@ -43,6 +44,7 @@ const FILE_PATHS: Record<DemoFileType, string> = {
   docx: "/sample-files/dataops_sample_template_v1.docx",
   dotx: "/sample-files/example.dotx",
   xlsx: "/sample-files/Label%20Report%20-%20Anti-assignment,%20CIC%20(Group%203).xlsx",
+  xlsxReport: "/sample-files/report.xlsx",
   pptx: "/sample-files/sample-4.pptx",
   pptx5: "/sample-files/sample-5.pptx",
 };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ViewerStatus } from "../primitives/ViewerStatus";
 import { CsvRenderer } from "./CsvRenderer";
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
+import { normalizeXlsxRelationshipTargets } from "./xlsx/normalizeXlsxRelationshipTargets";
 
 export interface SpreadsheetRendererProps {
   blob: Blob;
@@ -30,8 +31,12 @@ function WorkbookViewerClient({
   const controller = xlsx.useXlsxViewerController({
     file: data,
     fileName: "workbook.xlsx",
+    maxFileSizeBytes: 50 * 1024 * 1024,
     readOnly: true,
-    useWorker: true,
+    // The package worker URL is not reliable when this library is consumed
+    // from a Vite dev server (Firefox resolves it as file://). The main
+    // thread path retains Extend's chart/image renderer and avoids retries.
+    useWorker: false,
   });
   const lastSheetNamesRef = useRef("");
 
@@ -58,10 +63,13 @@ function WorkbookViewerClient({
     <div className={`${RENDERER_VIEWPORT_CLASS} min-h-0`}>
       <xlsx.XlsxViewer
         controller={controller}
+        allowResizeInReadOnly
         experimentalCanvas
         readOnly
         showDefaultToolbar={false}
         showImages
+        loadingState={<ViewerStatus>Loading workbook...</ViewerStatus>}
+        errorState={(error) => <ViewerStatus tone="error">{error.message}</ViewerStatus>}
       />
     </div>
   );
@@ -70,6 +78,8 @@ function WorkbookViewerClient({
 /** Loads the browser-only workbook implementation only after mount. */
 function WorkbookViewer(props: WorkbookViewerProps) {
   const [xlsx, setXlsx] = useState<XlsxModule | null>(null);
+  const onErrorRef = useRef(props.onError);
+  onErrorRef.current = props.onError;
 
   useEffect(() => {
     let disposed = false;
@@ -78,13 +88,17 @@ function WorkbookViewer(props: WorkbookViewerProps) {
         if (!disposed) setXlsx(module);
       },
       (error) => {
-        if (!disposed) props.onError(error instanceof Error ? error : new Error("Failed to load spreadsheet viewer."));
+        if (!disposed) {
+          onErrorRef.current(
+            error instanceof Error ? error : new Error("Failed to load spreadsheet viewer."),
+          );
+        }
       },
     );
     return () => {
       disposed = true;
     };
-  }, [props.onError]);
+  }, []);
 
   if (xlsx == null) return <ViewerStatus>Loading spreadsheet...</ViewerStatus>;
   return <WorkbookViewerClient {...props} xlsx={xlsx} />;
@@ -93,23 +107,29 @@ function WorkbookViewer(props: WorkbookViewerProps) {
 export function SpreadsheetRenderer({ blob, activeSheetIndex, onError, onSheetNamesChange }: SpreadsheetRendererProps) {
   const isCsv = blob.type.toLowerCase().split(";", 1)[0]?.trim() === "text/csv";
   const [data, setData] = useState<ArrayBuffer | null>(null);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     if (isCsv) return;
     let disposed = false;
     setData(null);
-    void blob.arrayBuffer().then(
+    void blob.arrayBuffer().then(normalizeXlsxRelationshipTargets).then(
       (buffer) => {
         if (!disposed) setData(buffer);
       },
       (error) => {
-        if (!disposed) onError(error instanceof Error ? error : new Error("Failed to read spreadsheet."));
+        if (!disposed) {
+          onErrorRef.current(
+            error instanceof Error ? error : new Error("Failed to read spreadsheet."),
+          );
+        }
       },
     );
     return () => {
       disposed = true;
     };
-  }, [blob, isCsv, onError]);
+  }, [blob, isCsv]);
 
   if (isCsv) return <CsvRenderer blob={blob} onError={onError} />;
   if (data == null) return <ViewerStatus>Loading spreadsheet...</ViewerStatus>;

@@ -10,6 +10,7 @@ export type DemoFileType =
   | "docx"
   | "dotx"
   | "xlsx"
+  | "xlsxReport"
   | "pptx"
   | "pptx5";
 export type SourceMode = "url" | "blob" | "base64" | "stream";
@@ -37,6 +38,7 @@ const FILE_TYPES: readonly DemoFileType[] = [
   "docx",
   "dotx",
   "xlsx",
+  "xlsxReport",
   "pptx",
   "pptx5",
 ];

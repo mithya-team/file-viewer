@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { detectFileKind } from "./detect/detectFileKind";
 import { FileViewerDefaultChrome } from "./FileViewerDefaultChrome";
 import { isTiffDetection } from "./image/isTiff";
@@ -491,18 +491,18 @@ export function FileViewer({
     );
   }, [failureState, renderFallback]);
 
-  function handleRenderError(nextError: Error) {
+  const handleRenderError = useCallback((nextError: Error) => {
     setRenderError(nextError);
     onError?.(nextError, { stage: "render", sourceType: sourceTypeOf(source) });
-  }
+  }, [onError, source]);
 
-  function handleSheetNamesChange(nextSheetNames: string[]) {
+  const handleSheetNamesChange = useCallback((nextSheetNames: string[]) => {
     setSheetNames(nextSheetNames);
     setActiveSheetIndex((current) => {
       if (nextSheetNames.length === 0) return 0;
       return Math.min(current, nextSheetNames.length - 1);
     });
-  }
+  }, []);
 
   function requestPdfPage(page: number) {
     setPdfNavIntent((intent) => intent + 1);
