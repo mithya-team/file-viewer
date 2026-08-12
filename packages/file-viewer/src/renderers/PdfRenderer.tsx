@@ -4,9 +4,19 @@ import {
   useDocumentManagerCapability,
 } from "@embedpdf/plugin-document-manager/react";
 import { RenderLayer, RenderPluginPackage } from "@embedpdf/plugin-render/react";
-import { Scroller, ScrollPluginPackage, useScroll } from "@embedpdf/plugin-scroll/react";
+import {
+  Scroller,
+  ScrollPluginPackage,
+  useScroll,
+  useScrollCapability,
+} from "@embedpdf/plugin-scroll/react";
 import { SearchLayer, SearchPluginPackage, useSearch } from "@embedpdf/plugin-search/react";
-import { Viewport, ViewportPluginPackage, useViewportScrollActivity } from "@embedpdf/plugin-viewport/react";
+import {
+  Viewport,
+  ViewportPluginPackage,
+  useViewportCapability,
+  useViewportScrollActivity,
+} from "@embedpdf/plugin-viewport/react";
 import { ZoomPluginPackage, useZoom } from "@embedpdf/plugin-zoom/react";
 import type { PdfEngine, SearchResult } from "@embedpdf/models";
 import { type MutableRefObject, useEffect, useRef, useState } from "react";
@@ -102,7 +112,7 @@ function PdfDocumentSurface({
 }: PdfDocumentSurfaceProps) {
   const { provides: documentManager } = useDocumentManagerCapability();
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const lastIntentRef = useRef(navIntent);
+  const lastIntentRef = useRef(0);
   const generationRef = useRef(0);
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
@@ -139,7 +149,7 @@ function PdfDocumentSurface({
 
     onGeometryReadyChangeRef.current?.(false);
     setDocumentId(null);
-    lastIntentRef.current = navIntent;
+    lastIntentRef.current = navIntent > 0 ? navIntent - 1 : 0;
     void blob
       .arrayBuffer()
       .then((buffer) =>
@@ -162,6 +172,8 @@ function PdfDocumentSurface({
         if (document.pageCount < 1) throw new Error("PDF has no pages.");
         setDocumentId(openedDocumentId ?? nextDocumentId);
         onPageCountChangeRef.current(document.pageCount);
+        // Parsing completion means the renderer can be mounted and displayed.
+        // Scroll layout readiness remains a separate gate for page commands.
         onGeometryReadyChangeRef.current?.(true);
       })
       .catch((error) => {
@@ -207,10 +219,78 @@ function PdfDocumentViewport({
 }: PdfDocumentViewportProps) {
   const documentState = useDocumentState(documentId);
   const scroll = useScroll(documentId);
+  const { provides: scrollCapability } = useScrollCapability();
+  const { provides: viewportCapability } = useViewportCapability();
   const zoomControl = useZoom(documentId);
   const search = useSearch(documentId);
   const scrollActivity = useViewportScrollActivity(documentId);
   const latestNavigationRef = useRef<{ intent: number; page: number } | null>(null);
+  const pendingNavigationRef = useRef<{ intent: number; page: number } | null>(null);
+  const scrollCapabilityRef = useRef(scrollCapability);
+  const scrollProvidesRef = useRef(scroll.provides);
+  const scrollActivityRef = useRef(scrollActivity);
+  const viewportCapabilityRef = useRef(viewportCapability);
+  const zoomProvidesRef = useRef(zoomControl.provides);
+  const layoutReadyRef = useRef(false);
+  const lastZoomRef = useRef<number | null>(null);
+  const flushPendingNavigationRef = useRef(() => {});
+  const applyZoomRef = useRef(() => {});
+
+  scrollCapabilityRef.current = scrollCapability;
+  scrollProvidesRef.current = scroll.provides;
+  scrollActivityRef.current = scrollActivity;
+  viewportCapabilityRef.current = viewportCapability;
+  zoomProvidesRef.current = zoomControl.provides;
+
+  flushPendingNavigationRef.current = () => {
+    if (!layoutReadyRef.current) return;
+    const pending = pendingNavigationRef.current;
+    const scrollProvides = scrollProvidesRef.current;
+    if (pending == null || scrollProvides == null) return;
+
+    pendingNavigationRef.current = null;
+    lastIntentRef.current = pending.intent;
+    latestNavigationRef.current = pending;
+    scrollProvides.scrollToPage({
+      pageNumber: pending.page,
+      behavior: "smooth",
+      alignY: 0,
+    });
+  };
+
+  applyZoomRef.current = () => {
+    // EmbedPDF gates the viewport while a document is loading and releases that
+    // gate when the first zoom request is handled. This initial request must
+    // therefore happen before layout-ready; waiting for layout-ready would
+    // leave the Scroller unmounted and the viewer permanently blank. The
+    // document/zoom effect below only calls this for semantic changes, so the
+    // request remains stable and does not re-run on every scoped-control update.
+    if (lastZoomRef.current === zoom) return;
+    // Scaling while a smooth page jump or user scroll is still settling makes
+    // EmbedPDF recompute visible pages against an intermediate scroll offset.
+    // Hold the requested zoom until the scroll activity is idle so the active
+    // page remains anchored throughout the scale transaction.
+    if (scrollActivityRef.current.isScrolling || scrollActivityRef.current.isSmoothScrolling) return;
+    const viewportScope = viewportCapabilityRef.current?.forDocument(documentId);
+    if (viewportScope == null) return;
+    const metrics = viewportScope.getMetrics();
+    // The first effect can run before ResizeObserver has reported the viewport
+    // dimensions. A request made with zero dimensions is ignored by EmbedPDF,
+    // so leave it pending for the resize callback below.
+    if (metrics.clientWidth === 0 || metrics.clientHeight === 0) return;
+    if (zoom === 100) {
+      // The document was opened at the default scale already. Releasing the
+      // loading gate directly avoids a redundant scale/scroll transaction,
+      // which otherwise briefly repaints the first page during initialization.
+      viewportScope.releaseGate("zoom");
+      lastZoomRef.current = zoom;
+      return;
+    }
+    const zoomProvides = zoomProvidesRef.current;
+    if (zoomProvides == null) return;
+    lastZoomRef.current = zoom;
+    zoomProvides.requestZoom(zoom / 100);
+  };
 
   useEffect(() => {
     if (documentState?.document == null) return;
@@ -218,24 +298,49 @@ function PdfDocumentViewport({
   }, [callbacks, documentState?.document]);
 
   useEffect(() => {
-    if (scroll.provides == null) return;
-    return scroll.provides.onPageChange((event) => {
+    if (scrollCapability == null) return;
+    return scrollCapability.onPageChange((event) => {
+      if (event.documentId !== documentId) return;
+      const pageChangeState = scrollCapabilityRef.current
+        ?.forDocument(documentId)
+        .getPageChangeState();
+      if (
+        pendingNavigationRef.current != null
+        || latestNavigationRef.current != null
+        || pageChangeState?.isChanging
+      ) return;
       callbacks.onVisiblePageChange.current?.(event.pageNumber);
     });
-  }, [callbacks, scroll.provides]);
+  }, [callbacks, documentId, scrollCapability]);
 
   useEffect(() => {
-    if (scroll.provides == null) return;
-    if (navIntent === lastIntentRef.current) return;
-    lastIntentRef.current = navIntent;
-    const targetPage = Math.max(1, Math.min(page, scroll.state.totalPages || page));
-    latestNavigationRef.current = { intent: navIntent, page: targetPage };
-    scroll.provides.scrollToPage({
-      pageNumber: targetPage,
-      behavior: "smooth",
-      alignY: 0,
+    if (scrollCapability == null) return;
+    return scrollCapability.onLayoutReady((event) => {
+      if (event.documentId !== documentId) return;
+      layoutReadyRef.current = true;
+      callbacks.onGeometryReadyChange.current?.(true);
+      flushPendingNavigationRef.current();
+      applyZoomRef.current();
     });
-  }, [lastIntentRef, navIntent, page, scroll.provides, scroll.state.totalPages]);
+  }, [callbacks, documentId, scrollCapability]);
+
+  useEffect(() => {
+    return () => {
+      layoutReadyRef.current = false;
+      pendingNavigationRef.current = null;
+      latestNavigationRef.current = null;
+      lastZoomRef.current = null;
+      callbacks.onGeometryReadyChange.current?.(false);
+    };
+  }, [callbacks]);
+
+  useEffect(() => {
+    if (navIntent === lastIntentRef.current) return;
+    const pageCount = scrollProvidesRef.current?.getTotalPages() ?? scroll.state.totalPages;
+    const targetPage = Math.max(1, Math.min(page, pageCount || page));
+    pendingNavigationRef.current = { intent: navIntent, page: targetPage };
+    flushPendingNavigationRef.current();
+  }, [navIntent, page, scroll.state.totalPages]);
 
   useEffect(() => {
     const pending = latestNavigationRef.current;
@@ -251,9 +356,16 @@ function PdfDocumentViewport({
   }, [callbacks, scroll.state.currentPage, scrollActivity.isScrolling, scrollActivity.isSmoothScrolling]);
 
   useEffect(() => {
-    if (zoomControl.provides == null) return;
-    zoomControl.provides.requestZoom(zoom / 100);
-  }, [zoom, zoomControl.provides]);
+    applyZoomRef.current();
+  }, [documentId, scrollActivity.isScrolling, scrollActivity.isSmoothScrolling, viewportCapability, zoom]);
+
+  useEffect(() => {
+    if (viewportCapability == null) return;
+    return viewportCapability.onViewportResize((event) => {
+      if (event.documentId !== documentId) return;
+      applyZoomRef.current();
+    });
+  }, [documentId, viewportCapability]);
 
   useEffect(() => {
     if (search.provides == null) return;
