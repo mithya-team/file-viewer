@@ -1,636 +1,675 @@
 /*! tailwindcss v4.3.0 | MIT License | https://tailwindcss.com */
 @layer properties;
-@layer theme {
-  :root, :host {
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-    monospace;
-    --color-white: #fff;
-    --spacing: 0.25rem;
-    --text-xs: 0.75rem;
-    --text-xs--line-height: calc(1 / 0.75);
-    --text-sm: 0.875rem;
-    --text-sm--line-height: calc(1.25 / 0.875);
-    --text-lg: 1.125rem;
-    --text-lg--line-height: calc(1.75 / 1.125);
-    --text-xl: 1.25rem;
-    --text-xl--line-height: calc(1.75 / 1.25);
-    --text-2xl: 1.5rem;
-    --text-2xl--line-height: calc(2 / 1.5);
-    --font-weight-semibold: 600;
-    --leading-relaxed: 1.625;
-    --ease-out: cubic-bezier(0, 0, 0.2, 1);
-    --default-transition-duration: 150ms;
-    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-}
 @layer utilities {
-  .absolute {
+  [data-file-viewer-root].absolute,
+  [data-file-viewer-root] .absolute {
     position: absolute;
   }
-  .relative {
+  [data-file-viewer-root].relative,
+  [data-file-viewer-root] .relative {
     position: relative;
   }
-  .inset-0 {
-    inset: calc(var(--spacing) * 0);
+  [data-file-viewer-root].inset-0,
+  [data-file-viewer-root] .inset-0 {
+    inset: calc(var(--file-viewer-spacing, 0.25rem) * 0);
   }
-  .container {
-    width: 100%;
-    @media (width >= 40rem) {
-      max-width: 40rem;
-    }
-    @media (width >= 48rem) {
-      max-width: 48rem;
-    }
-    @media (width >= 64rem) {
-      max-width: 64rem;
-    }
-    @media (width >= 80rem) {
-      max-width: 80rem;
-    }
-    @media (width >= 96rem) {
-      max-width: 96rem;
-    }
-  }
-  .mx-auto {
+  [data-file-viewer-root].mx-auto,
+  [data-file-viewer-root] .mx-auto {
     margin-inline: auto;
   }
-  .my-3 {
-    margin-block: calc(var(--spacing) * 3);
+  [data-file-viewer-root].my-3,
+  [data-file-viewer-root] .my-3 {
+    margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 3);
   }
-  .ml-auto {
+  [data-file-viewer-root].ml-auto,
+  [data-file-viewer-root] .ml-auto {
     margin-left: auto;
   }
-  .block {
+  [data-file-viewer-root].block,
+  [data-file-viewer-root] .block {
     display: block;
   }
-  .flex {
+  [data-file-viewer-root].flex,
+  [data-file-viewer-root] .flex {
     display: flex;
   }
-  .grid {
-    display: grid;
-  }
-  .inline-flex {
+  [data-file-viewer-root].inline-flex,
+  [data-file-viewer-root] .inline-flex {
     display: inline-flex;
   }
-  .table {
-    display: table;
-  }
-  .h-auto {
+  [data-file-viewer-root].h-auto,
+  [data-file-viewer-root] .h-auto {
     height: auto;
   }
-  .h-full {
+  [data-file-viewer-root].h-full,
+  [data-file-viewer-root] .h-full {
     height: 100%;
   }
-  .max-h-full {
+  [data-file-viewer-root].max-h-full,
+  [data-file-viewer-root] .max-h-full {
     max-height: 100%;
   }
-  .min-h-0 {
-    min-height: calc(var(--spacing) * 0);
+  [data-file-viewer-root].min-h-0,
+  [data-file-viewer-root] .min-h-0 {
+    min-height: calc(var(--file-viewer-spacing, 0.25rem) * 0);
   }
-  .min-h-24 {
-    min-height: calc(var(--spacing) * 24);
+  [data-file-viewer-root].min-h-24,
+  [data-file-viewer-root] .min-h-24 {
+    min-height: calc(var(--file-viewer-spacing, 0.25rem) * 24);
   }
-  .min-h-full {
+  [data-file-viewer-root].min-h-full,
+  [data-file-viewer-root] .min-h-full {
     min-height: 100%;
   }
-  .w-14 {
-    width: calc(var(--spacing) * 14);
+  [data-file-viewer-root].w-14,
+  [data-file-viewer-root] .w-14 {
+    width: calc(var(--file-viewer-spacing, 0.25rem) * 14);
   }
-  .w-full {
+  [data-file-viewer-root].w-full,
+  [data-file-viewer-root] .w-full {
     width: 100%;
   }
-  .max-w-full {
+  [data-file-viewer-root].max-w-full,
+  [data-file-viewer-root] .max-w-full {
     max-width: 100%;
   }
-  .max-w-none {
+  [data-file-viewer-root].max-w-none,
+  [data-file-viewer-root] .max-w-none {
     max-width: none;
   }
-  .min-w-0 {
-    min-width: calc(var(--spacing) * 0);
+  [data-file-viewer-root].min-w-0,
+  [data-file-viewer-root] .min-w-0 {
+    min-width: calc(var(--file-viewer-spacing, 0.25rem) * 0);
   }
-  .min-w-full {
+  [data-file-viewer-root].min-w-full,
+  [data-file-viewer-root] .min-w-full {
     min-width: 100%;
   }
-  .flex-1 {
+  [data-file-viewer-root].flex-1,
+  [data-file-viewer-root] .flex-1 {
     flex: 1;
   }
-  .shrink-0 {
+  [data-file-viewer-root].shrink-0,
+  [data-file-viewer-root] .shrink-0 {
     flex-shrink: 0;
   }
-  .cursor-grab {
+  [data-file-viewer-root].cursor-grab,
+  [data-file-viewer-root] .cursor-grab {
     cursor: grab;
   }
-  .cursor-grabbing {
+  [data-file-viewer-root].cursor-grabbing,
+  [data-file-viewer-root] .cursor-grabbing {
     cursor: grabbing;
   }
-  .cursor-pointer {
+  [data-file-viewer-root].cursor-pointer,
+  [data-file-viewer-root] .cursor-pointer {
     cursor: pointer;
   }
-  .cursor-zoom-in {
+  [data-file-viewer-root].cursor-zoom-in,
+  [data-file-viewer-root] .cursor-zoom-in {
     cursor: zoom-in;
   }
-  .flex-col {
+  [data-file-viewer-root].flex-col,
+  [data-file-viewer-root] .flex-col {
     flex-direction: column;
   }
-  .flex-wrap {
+  [data-file-viewer-root].flex-wrap,
+  [data-file-viewer-root] .flex-wrap {
     flex-wrap: wrap;
   }
-  .items-center {
+  [data-file-viewer-root].items-center,
+  [data-file-viewer-root] .items-center {
     align-items: center;
   }
-  .justify-center {
+  [data-file-viewer-root].justify-center,
+  [data-file-viewer-root] .justify-center {
     justify-content: center;
   }
-  .gap-2 {
-    gap: calc(var(--spacing) * 2);
+  [data-file-viewer-root].gap-2,
+  [data-file-viewer-root] .gap-2 {
+    gap: calc(var(--file-viewer-spacing, 0.25rem) * 2);
   }
-  .gap-3 {
-    gap: calc(var(--spacing) * 3);
+  [data-file-viewer-root].gap-3,
+  [data-file-viewer-root] .gap-3 {
+    gap: calc(var(--file-viewer-spacing, 0.25rem) * 3);
   }
-  .overflow-auto {
+  [data-file-viewer-root].overflow-auto,
+  [data-file-viewer-root] .overflow-auto {
     overflow: auto;
   }
-  .overflow-hidden {
+  [data-file-viewer-root].overflow-hidden,
+  [data-file-viewer-root] .overflow-hidden {
     overflow: hidden;
   }
-  .overflow-x-auto {
+  [data-file-viewer-root].overflow-x-auto,
+  [data-file-viewer-root] .overflow-x-auto {
     overflow-x: auto;
   }
-  .rounded {
-    border-radius: 0.25rem;
-  }
-  .border {
-    border-style: var(--tw-border-style);
+  [data-file-viewer-root].border,
+  [data-file-viewer-root] .border {
+    border-style: var(--file-viewer-tw-border-style, solid);
     border-width: 1px;
   }
-  .border-0 {
-    border-style: var(--tw-border-style);
+  [data-file-viewer-root].border-0,
+  [data-file-viewer-root] .border-0 {
+    border-style: var(--file-viewer-tw-border-style, solid);
     border-width: 0px;
   }
-  .border-b {
-    border-bottom-style: var(--tw-border-style);
+  [data-file-viewer-root].border-b,
+  [data-file-viewer-root] .border-b {
+    border-bottom-style: var(--file-viewer-tw-border-style, solid);
     border-bottom-width: 1px;
   }
-  .\[border-color\:var\(--file-viewer-border\,_\#cbd5e1\)\] {
+  [data-file-viewer-root].\[border-color\:var\(--file-viewer-border\,_\#cbd5e1\)\],
+  [data-file-viewer-root] .\[border-color\:var\(--file-viewer-border\,_\#cbd5e1\)\] {
     border-color: var(--file-viewer-border, #cbd5e1);
   }
-  .\[border-color\:var\(--file-viewer-border-strong\,_\#94a3b8\)\] {
+  [data-file-viewer-root].\[border-color\:var\(--file-viewer-border-strong\,_\#94a3b8\)\],
+  [data-file-viewer-root] .\[border-color\:var\(--file-viewer-border-strong\,_\#94a3b8\)\] {
     border-color: var(--file-viewer-border-strong, #94a3b8);
   }
-  .border-\(--file-viewer-border\,\#cbd5e1\) {
+  [data-file-viewer-root].border-\(--file-viewer-border\,\#cbd5e1\),
+  [data-file-viewer-root] .border-\(--file-viewer-border\,\#cbd5e1\) {
     border-color: var(--file-viewer-border,#cbd5e1);
   }
-  .\[background-color\:var\(--file-viewer-surface\,_\#ffffff\)\] {
+  [data-file-viewer-root].\[background-color\:var\(--file-viewer-surface\,_\#ffffff\)\],
+  [data-file-viewer-root] .\[background-color\:var\(--file-viewer-surface\,_\#ffffff\)\] {
     background-color: var(--file-viewer-surface, #ffffff);
   }
-  .\[background-color\:var\(--file-viewer-surface-muted\,_\#f8fafc\)\] {
+  [data-file-viewer-root].\[background-color\:var\(--file-viewer-surface-muted\,_\#f8fafc\)\],
+  [data-file-viewer-root] .\[background-color\:var\(--file-viewer-surface-muted\,_\#f8fafc\)\] {
     background-color: var(--file-viewer-surface-muted, #f8fafc);
   }
-  .bg-\(--file-viewer-surface\,\#ffffff\) {
+  [data-file-viewer-root].bg-\(--file-viewer-surface\,\#ffffff\),
+  [data-file-viewer-root] .bg-\(--file-viewer-surface\,\#ffffff\) {
     background-color: var(--file-viewer-surface,#ffffff);
   }
-  .bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
+  [data-file-viewer-root].bg-\(--file-viewer-surface-muted\,\#f8fafc\),
+  [data-file-viewer-root] .bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
     background-color: var(--file-viewer-surface-muted,#f8fafc);
   }
-  .bg-transparent {
+  [data-file-viewer-root].bg-transparent,
+  [data-file-viewer-root] .bg-transparent {
     background-color: transparent;
   }
-  .bg-white {
-    background-color: var(--color-white);
+  [data-file-viewer-root].bg-white,
+  [data-file-viewer-root] .bg-white {
+    background-color: var(--file-viewer-color-white, #fff);
   }
-  .object-contain {
+  [data-file-viewer-root].object-contain,
+  [data-file-viewer-root] .object-contain {
     object-fit: contain;
   }
-  .p-4 {
-    padding: calc(var(--spacing) * 4);
+  [data-file-viewer-root].p-4,
+  [data-file-viewer-root] .p-4 {
+    padding: calc(var(--file-viewer-spacing, 0.25rem) * 4);
   }
-  .p-6 {
-    padding: calc(var(--spacing) * 6);
+  [data-file-viewer-root].p-6,
+  [data-file-viewer-root] .p-6 {
+    padding: calc(var(--file-viewer-spacing, 0.25rem) * 6);
   }
-  .px-1 {
-    padding-inline: calc(var(--spacing) * 1);
+  [data-file-viewer-root].px-1,
+  [data-file-viewer-root] .px-1 {
+    padding-inline: calc(var(--file-viewer-spacing, 0.25rem) * 1);
   }
-  .px-2 {
-    padding-inline: calc(var(--spacing) * 2);
+  [data-file-viewer-root].px-2,
+  [data-file-viewer-root] .px-2 {
+    padding-inline: calc(var(--file-viewer-spacing, 0.25rem) * 2);
   }
-  .px-3 {
-    padding-inline: calc(var(--spacing) * 3);
+  [data-file-viewer-root].px-3,
+  [data-file-viewer-root] .px-3 {
+    padding-inline: calc(var(--file-viewer-spacing, 0.25rem) * 3);
   }
-  .py-0\.5 {
-    padding-block: calc(var(--spacing) * 0.5);
+  [data-file-viewer-root].py-0\.5,
+  [data-file-viewer-root] .py-0\.5 {
+    padding-block: calc(var(--file-viewer-spacing, 0.25rem) * 0.5);
   }
-  .py-1 {
-    padding-block: calc(var(--spacing) * 1);
+  [data-file-viewer-root].py-1,
+  [data-file-viewer-root] .py-1 {
+    padding-block: calc(var(--file-viewer-spacing, 0.25rem) * 1);
   }
-  .py-2 {
-    padding-block: calc(var(--spacing) * 2);
+  [data-file-viewer-root].py-2,
+  [data-file-viewer-root] .py-2 {
+    padding-block: calc(var(--file-viewer-spacing, 0.25rem) * 2);
   }
-  .pb-4 {
-    padding-bottom: calc(var(--spacing) * 4);
+  [data-file-viewer-root].pb-4,
+  [data-file-viewer-root] .pb-4 {
+    padding-bottom: calc(var(--file-viewer-spacing, 0.25rem) * 4);
   }
-  .text-center {
+  [data-file-viewer-root].text-center,
+  [data-file-viewer-root] .text-center {
     text-align: center;
   }
-  .font-mono {
-    font-family: var(--font-mono);
+  [data-file-viewer-root].font-mono,
+  [data-file-viewer-root] .font-mono {
+    font-family: var(--file-viewer-font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
   }
-  .text-sm {
-    font-size: var(--text-sm);
-    line-height: var(--tw-leading, var(--text-sm--line-height));
+  [data-file-viewer-root].text-sm,
+  [data-file-viewer-root] .text-sm {
+    font-size: var(--file-viewer-text-sm, 0.875rem);
+    line-height: var(--file-viewer-tw-leading, var(--file-viewer-text-sm-line-height, calc(1.25 / 0.875)));
   }
-  .text-xs {
-    font-size: var(--text-xs);
-    line-height: var(--tw-leading, var(--text-xs--line-height));
+  [data-file-viewer-root].text-xs,
+  [data-file-viewer-root] .text-xs {
+    font-size: var(--file-viewer-text-xs, 0.75rem);
+    line-height: var(--file-viewer-tw-leading, var(--file-viewer-text-xs-line-height, calc(1 / 0.75)));
   }
-  .leading-relaxed {
-    --tw-leading: var(--leading-relaxed);
-    line-height: var(--leading-relaxed);
+  [data-file-viewer-root].leading-relaxed,
+  [data-file-viewer-root] .leading-relaxed {
+    --file-viewer-tw-leading: var(--file-viewer-leading-relaxed, 1.625);
+    line-height: var(--file-viewer-leading-relaxed, 1.625);
   }
-  .break-words {
+  [data-file-viewer-root].wrap-break-word,
+  [data-file-viewer-root] .wrap-break-word {
     overflow-wrap: break-word;
   }
-  .wrap-break-word {
-    overflow-wrap: break-word;
-  }
-  .whitespace-pre-wrap {
+  [data-file-viewer-root].whitespace-pre-wrap,
+  [data-file-viewer-root] .whitespace-pre-wrap {
     white-space: pre-wrap;
   }
-  .\[color\:var\(--file-viewer-danger\,_\#dc2626\)\] {
+  [data-file-viewer-root].\[color\:var\(--file-viewer-danger\,_\#dc2626\)\],
+  [data-file-viewer-root] .\[color\:var\(--file-viewer-danger\,_\#dc2626\)\] {
     color: var(--file-viewer-danger, #dc2626);
   }
-  .\[color\:var\(--file-viewer-foreground\,_\#334155\)\] {
+  [data-file-viewer-root].\[color\:var\(--file-viewer-foreground\,_\#334155\)\],
+  [data-file-viewer-root] .\[color\:var\(--file-viewer-foreground\,_\#334155\)\] {
     color: var(--file-viewer-foreground, #334155);
   }
-  .\[color\:var\(--file-viewer-foreground-strong\,_\#0f172a\)\] {
+  [data-file-viewer-root].\[color\:var\(--file-viewer-foreground-strong\,_\#0f172a\)\],
+  [data-file-viewer-root] .\[color\:var\(--file-viewer-foreground-strong\,_\#0f172a\)\] {
     color: var(--file-viewer-foreground-strong, #0f172a);
   }
-  .\[color\:var\(--file-viewer-muted\,_\#64748b\)\] {
+  [data-file-viewer-root].\[color\:var\(--file-viewer-muted\,_\#64748b\)\],
+  [data-file-viewer-root] .\[color\:var\(--file-viewer-muted\,_\#64748b\)\] {
     color: var(--file-viewer-muted, #64748b);
   }
-  .text-\(--file-viewer-foreground\,\#334155\) {
+  [data-file-viewer-root].text-\(--file-viewer-foreground\,\#334155\),
+  [data-file-viewer-root] .text-\(--file-viewer-foreground\,\#334155\) {
     color: var(--file-viewer-foreground,#334155);
   }
-  .text-\(--file-viewer-muted\,\#64748b\) {
+  [data-file-viewer-root].text-\(--file-viewer-muted\,\#64748b\),
+  [data-file-viewer-root] .text-\(--file-viewer-muted\,\#64748b\) {
     color: var(--file-viewer-muted,#64748b);
   }
-  .\[box-shadow\:var\(--file-viewer-shadow\,0_1px_2px_rgb\(15_23_42\/0\.08\)\)\] {
+  [data-file-viewer-root].\[box-shadow\:var\(--file-viewer-shadow\,0_1px_2px_rgb\(15_23_42\/0\.08\)\)\],
+  [data-file-viewer-root] .\[box-shadow\:var\(--file-viewer-shadow\,0_1px_2px_rgb\(15_23_42\/0\.08\)\)\] {
     box-shadow: var(--file-viewer-shadow,0 1px 2px rgb(15 23 42/0.08));
   }
-  .transition {
-    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
-    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
-    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  [data-file-viewer-root].transition,
+  [data-file-viewer-root] .transition {
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --file-viewer-tw-gradient-from, --file-viewer-tw-gradient-via, --file-viewer-tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--file-viewer-tw-ease, var(--file-viewer-transition-timing-function, cubic-bezier(0.4, 0, 0.2, 1)));
+    transition-duration: var(--file-viewer-tw-duration, var(--file-viewer-transition-duration, 150ms));
   }
-  .ease-out {
-    --tw-ease: var(--ease-out);
-    transition-timing-function: var(--ease-out);
-  }
-  .select-none {
+  [data-file-viewer-root].select-none,
+  [data-file-viewer-root] .select-none {
     -webkit-user-select: none;
     user-select: none;
   }
-  .disabled\:cursor-not-allowed {
+  [data-file-viewer-root].disabled\:cursor-not-allowed,
+  [data-file-viewer-root] .disabled\:cursor-not-allowed {
     &:disabled {
       cursor: not-allowed;
     }
   }
-  .disabled\:opacity-50 {
+  [data-file-viewer-root].disabled\:opacity-50,
+  [data-file-viewer-root] .disabled\:opacity-50 {
     &:disabled {
       opacity: 50%;
     }
   }
-  .\[\&_a\]\:text-\(--file-viewer-accent\,\#2563eb\) {
+  [data-file-viewer-root].\[\&_a\]\:text-\(--file-viewer-accent\,\#2563eb\),
+  [data-file-viewer-root] .\[\&_a\]\:text-\(--file-viewer-accent\,\#2563eb\) {
     & a {
       color: var(--file-viewer-accent,#2563eb);
     }
   }
-  .\[\&_a\]\:underline {
+  [data-file-viewer-root].\[\&_a\]\:underline,
+  [data-file-viewer-root] .\[\&_a\]\:underline {
     & a {
       text-decoration-line: underline;
     }
   }
-  .\[\&_blockquote\]\:my-3 {
+  [data-file-viewer-root].\[\&_blockquote\]\:my-3,
+  [data-file-viewer-root] .\[\&_blockquote\]\:my-3 {
     & blockquote {
-      margin-block: calc(var(--spacing) * 3);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 3);
     }
   }
-  .\[\&_blockquote\]\:border-l-4 {
+  [data-file-viewer-root].\[\&_blockquote\]\:border-l-4,
+  [data-file-viewer-root] .\[\&_blockquote\]\:border-l-4 {
     & blockquote {
-      border-left-style: var(--tw-border-style);
+      border-left-style: var(--file-viewer-tw-border-style, solid);
       border-left-width: 4px;
     }
   }
-  .\[\&_blockquote\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
+  [data-file-viewer-root].\[\&_blockquote\]\:border-\(--file-viewer-border\,\#cbd5e1\),
+  [data-file-viewer-root] .\[\&_blockquote\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
     & blockquote {
       border-color: var(--file-viewer-border,#cbd5e1);
     }
   }
-  .\[\&_blockquote\]\:pl-3 {
+  [data-file-viewer-root].\[\&_blockquote\]\:pl-3,
+  [data-file-viewer-root] .\[\&_blockquote\]\:pl-3 {
     & blockquote {
-      padding-left: calc(var(--spacing) * 3);
+      padding-left: calc(var(--file-viewer-spacing, 0.25rem) * 3);
     }
   }
-  .\[\&_blockquote\]\:italic {
+  [data-file-viewer-root].\[\&_blockquote\]\:italic,
+  [data-file-viewer-root] .\[\&_blockquote\]\:italic {
     & blockquote {
       font-style: italic;
     }
   }
-  .\[\&_code\]\:rounded {
-    & code {
-      border-radius: 0.25rem;
-    }
-  }
-  .\[\&_code\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
+  [data-file-viewer-root].\[\&_code\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\),
+  [data-file-viewer-root] .\[\&_code\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
     & code {
       background-color: var(--file-viewer-surface-muted,#f8fafc);
     }
   }
-  .\[\&_code\]\:px-1 {
+  [data-file-viewer-root].\[\&_code\]\:px-1,
+  [data-file-viewer-root] .\[\&_code\]\:px-1 {
     & code {
-      padding-inline: calc(var(--spacing) * 1);
+      padding-inline: calc(var(--file-viewer-spacing, 0.25rem) * 1);
     }
   }
-  .\[\&_code\]\:py-0\.5 {
+  [data-file-viewer-root].\[\&_code\]\:py-0\.5,
+  [data-file-viewer-root] .\[\&_code\]\:py-0\.5 {
     & code {
-      padding-block: calc(var(--spacing) * 0.5);
+      padding-block: calc(var(--file-viewer-spacing, 0.25rem) * 0.5);
     }
   }
-  .\[\&_code\]\:font-mono {
+  [data-file-viewer-root].\[\&_code\]\:font-mono,
+  [data-file-viewer-root] .\[\&_code\]\:font-mono {
     & code {
-      font-family: var(--font-mono);
+      font-family: var(--file-viewer-font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
     }
   }
-  .\[\&_code\]\:text-xs {
+  [data-file-viewer-root].\[\&_code\]\:text-xs,
+  [data-file-viewer-root] .\[\&_code\]\:text-xs {
     & code {
-      font-size: var(--text-xs);
-      line-height: var(--tw-leading, var(--text-xs--line-height));
+      font-size: var(--file-viewer-text-xs, 0.75rem);
+      line-height: var(--file-viewer-tw-leading, var(--file-viewer-text-xs-line-height, calc(1 / 0.75)));
     }
   }
-  .\[\&_h1\]\:mt-0 {
+  [data-file-viewer-root].\[\&_h1\]\:mt-0,
+  [data-file-viewer-root] .\[\&_h1\]\:mt-0 {
     & h1 {
-      margin-top: calc(var(--spacing) * 0);
+      margin-top: calc(var(--file-viewer-spacing, 0.25rem) * 0);
     }
   }
-  .\[\&_h1\]\:mb-3 {
+  [data-file-viewer-root].\[\&_h1\]\:mb-3,
+  [data-file-viewer-root] .\[\&_h1\]\:mb-3 {
     & h1 {
-      margin-bottom: calc(var(--spacing) * 3);
+      margin-bottom: calc(var(--file-viewer-spacing, 0.25rem) * 3);
     }
   }
-  .\[\&_h1\]\:text-2xl {
+  [data-file-viewer-root].\[\&_h1\]\:text-2xl,
+  [data-file-viewer-root] .\[\&_h1\]\:text-2xl {
     & h1 {
-      font-size: var(--text-2xl);
-      line-height: var(--tw-leading, var(--text-2xl--line-height));
+      font-size: var(--file-viewer-text-2xl, 1.5rem);
+      line-height: var(--file-viewer-tw-leading, var(--file-viewer-text-2xl-line-height, calc(2 / 1.5)));
     }
   }
-  .\[\&_h1\]\:font-semibold {
+  [data-file-viewer-root].\[\&_h1\]\:font-semibold,
+  [data-file-viewer-root] .\[\&_h1\]\:font-semibold {
     & h1 {
-      --tw-font-weight: var(--font-weight-semibold);
-      font-weight: var(--font-weight-semibold);
+      --file-viewer-tw-font-weight: var(--file-viewer-font-weight-semibold, 600);
+      font-weight: var(--file-viewer-font-weight-semibold, 600);
     }
   }
-  .\[\&_h2\]\:mt-5 {
+  [data-file-viewer-root].\[\&_h2\]\:mt-5,
+  [data-file-viewer-root] .\[\&_h2\]\:mt-5 {
     & h2 {
-      margin-top: calc(var(--spacing) * 5);
+      margin-top: calc(var(--file-viewer-spacing, 0.25rem) * 5);
     }
   }
-  .\[\&_h2\]\:mb-2 {
+  [data-file-viewer-root].\[\&_h2\]\:mb-2,
+  [data-file-viewer-root] .\[\&_h2\]\:mb-2 {
     & h2 {
-      margin-bottom: calc(var(--spacing) * 2);
+      margin-bottom: calc(var(--file-viewer-spacing, 0.25rem) * 2);
     }
   }
-  .\[\&_h2\]\:text-xl {
+  [data-file-viewer-root].\[\&_h2\]\:text-xl,
+  [data-file-viewer-root] .\[\&_h2\]\:text-xl {
     & h2 {
-      font-size: var(--text-xl);
-      line-height: var(--tw-leading, var(--text-xl--line-height));
+      font-size: var(--file-viewer-text-xl, 1.25rem);
+      line-height: var(--file-viewer-tw-leading, var(--file-viewer-text-xl-line-height, calc(1.75 / 1.25)));
     }
   }
-  .\[\&_h2\]\:font-semibold {
+  [data-file-viewer-root].\[\&_h2\]\:font-semibold,
+  [data-file-viewer-root] .\[\&_h2\]\:font-semibold {
     & h2 {
-      --tw-font-weight: var(--font-weight-semibold);
-      font-weight: var(--font-weight-semibold);
+      --file-viewer-tw-font-weight: var(--file-viewer-font-weight-semibold, 600);
+      font-weight: var(--file-viewer-font-weight-semibold, 600);
     }
   }
-  .\[\&_h3\]\:mt-4 {
+  [data-file-viewer-root].\[\&_h3\]\:mt-4,
+  [data-file-viewer-root] .\[\&_h3\]\:mt-4 {
     & h3 {
-      margin-top: calc(var(--spacing) * 4);
+      margin-top: calc(var(--file-viewer-spacing, 0.25rem) * 4);
     }
   }
-  .\[\&_h3\]\:mb-2 {
+  [data-file-viewer-root].\[\&_h3\]\:mb-2,
+  [data-file-viewer-root] .\[\&_h3\]\:mb-2 {
     & h3 {
-      margin-bottom: calc(var(--spacing) * 2);
+      margin-bottom: calc(var(--file-viewer-spacing, 0.25rem) * 2);
     }
   }
-  .\[\&_h3\]\:text-lg {
+  [data-file-viewer-root].\[\&_h3\]\:text-lg,
+  [data-file-viewer-root] .\[\&_h3\]\:text-lg {
     & h3 {
-      font-size: var(--text-lg);
-      line-height: var(--tw-leading, var(--text-lg--line-height));
+      font-size: var(--file-viewer-text-lg, 1.125rem);
+      line-height: var(--file-viewer-tw-leading, var(--file-viewer-text-lg-line-height, calc(1.75 / 1.125)));
     }
   }
-  .\[\&_h3\]\:font-semibold {
+  [data-file-viewer-root].\[\&_h3\]\:font-semibold,
+  [data-file-viewer-root] .\[\&_h3\]\:font-semibold {
     & h3 {
-      --tw-font-weight: var(--font-weight-semibold);
-      font-weight: var(--font-weight-semibold);
+      --file-viewer-tw-font-weight: var(--file-viewer-font-weight-semibold, 600);
+      font-weight: var(--file-viewer-font-weight-semibold, 600);
     }
   }
-  .\[\&_hr\]\:my-4 {
+  [data-file-viewer-root].\[\&_hr\]\:my-4,
+  [data-file-viewer-root] .\[\&_hr\]\:my-4 {
     & hr {
-      margin-block: calc(var(--spacing) * 4);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 4);
     }
   }
-  .\[\&_hr\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
+  [data-file-viewer-root].\[\&_hr\]\:border-\(--file-viewer-border\,\#cbd5e1\),
+  [data-file-viewer-root] .\[\&_hr\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
     & hr {
       border-color: var(--file-viewer-border,#cbd5e1);
     }
   }
-  .\[\&_img\]\:my-3 {
+  [data-file-viewer-root].\[\&_img\]\:my-3,
+  [data-file-viewer-root] .\[\&_img\]\:my-3 {
     & img {
-      margin-block: calc(var(--spacing) * 3);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 3);
     }
   }
-  .\[\&_img\]\:max-w-full {
+  [data-file-viewer-root].\[\&_img\]\:max-w-full,
+  [data-file-viewer-root] .\[\&_img\]\:max-w-full {
     & img {
       max-width: 100%;
     }
   }
-  .\[\&_li\]\:my-0\.5 {
+  [data-file-viewer-root].\[\&_li\]\:my-0\.5,
+  [data-file-viewer-root] .\[\&_li\]\:my-0\.5 {
     & li {
-      margin-block: calc(var(--spacing) * 0.5);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 0.5);
     }
   }
-  .\[\&_ol\]\:my-2 {
+  [data-file-viewer-root].\[\&_ol\]\:my-2,
+  [data-file-viewer-root] .\[\&_ol\]\:my-2 {
     & ol {
-      margin-block: calc(var(--spacing) * 2);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 2);
     }
   }
-  .\[\&_ol\]\:list-decimal {
+  [data-file-viewer-root].\[\&_ol\]\:list-decimal,
+  [data-file-viewer-root] .\[\&_ol\]\:list-decimal {
     & ol {
       list-style-type: decimal;
     }
   }
-  .\[\&_ol\]\:pl-6 {
+  [data-file-viewer-root].\[\&_ol\]\:pl-6,
+  [data-file-viewer-root] .\[\&_ol\]\:pl-6 {
     & ol {
-      padding-left: calc(var(--spacing) * 6);
+      padding-left: calc(var(--file-viewer-spacing, 0.25rem) * 6);
     }
   }
-  .\[\&_p\]\:my-2 {
+  [data-file-viewer-root].\[\&_p\]\:my-2,
+  [data-file-viewer-root] .\[\&_p\]\:my-2 {
     & p {
-      margin-block: calc(var(--spacing) * 2);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 2);
     }
   }
-  .\[\&_pre\]\:my-3 {
+  [data-file-viewer-root].\[\&_pre\]\:my-3,
+  [data-file-viewer-root] .\[\&_pre\]\:my-3 {
     & pre {
-      margin-block: calc(var(--spacing) * 3);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 3);
     }
   }
-  .\[\&_pre\]\:overflow-x-auto {
+  [data-file-viewer-root].\[\&_pre\]\:overflow-x-auto,
+  [data-file-viewer-root] .\[\&_pre\]\:overflow-x-auto {
     & pre {
       overflow-x: auto;
     }
   }
-  .\[\&_pre\]\:rounded {
+  [data-file-viewer-root].\[\&_pre\]\:border,
+  [data-file-viewer-root] .\[\&_pre\]\:border {
     & pre {
-      border-radius: 0.25rem;
-    }
-  }
-  .\[\&_pre\]\:border {
-    & pre {
-      border-style: var(--tw-border-style);
+      border-style: var(--file-viewer-tw-border-style, solid);
       border-width: 1px;
     }
   }
-  .\[\&_pre\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
+  [data-file-viewer-root].\[\&_pre\]\:border-\(--file-viewer-border\,\#cbd5e1\),
+  [data-file-viewer-root] .\[\&_pre\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
     & pre {
       border-color: var(--file-viewer-border,#cbd5e1);
     }
   }
-  .\[\&_pre\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
+  [data-file-viewer-root].\[\&_pre\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\),
+  [data-file-viewer-root] .\[\&_pre\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
     & pre {
       background-color: var(--file-viewer-surface-muted,#f8fafc);
     }
   }
-  .\[\&_pre\]\:p-3 {
+  [data-file-viewer-root].\[\&_pre\]\:p-3,
+  [data-file-viewer-root] .\[\&_pre\]\:p-3 {
     & pre {
-      padding: calc(var(--spacing) * 3);
+      padding: calc(var(--file-viewer-spacing, 0.25rem) * 3);
     }
   }
-  .\[\&_pre_code\]\:bg-transparent {
+  [data-file-viewer-root].\[\&_pre_code\]\:bg-transparent,
+  [data-file-viewer-root] .\[\&_pre_code\]\:bg-transparent {
     & pre code {
       background-color: transparent;
     }
   }
-  .\[\&_pre_code\]\:p-0 {
+  [data-file-viewer-root].\[\&_pre_code\]\:p-0,
+  [data-file-viewer-root] .\[\&_pre_code\]\:p-0 {
     & pre code {
-      padding: calc(var(--spacing) * 0);
+      padding: calc(var(--file-viewer-spacing, 0.25rem) * 0);
     }
   }
-  .\[\&_table\]\:w-full {
+  [data-file-viewer-root].\[\&_table\]\:w-full,
+  [data-file-viewer-root] .\[\&_table\]\:w-full {
     & table {
       width: 100%;
     }
   }
-  .\[\&_table\]\:border-collapse {
+  [data-file-viewer-root].\[\&_table\]\:border-collapse,
+  [data-file-viewer-root] .\[\&_table\]\:border-collapse {
     & table {
       border-collapse: collapse;
     }
   }
-  .\[\&_table\]\:text-left {
+  [data-file-viewer-root].\[\&_table\]\:text-left,
+  [data-file-viewer-root] .\[\&_table\]\:text-left {
     & table {
       text-align: left;
     }
   }
-  .\[\&_td\]\:border {
+  [data-file-viewer-root].\[\&_td\]\:border,
+  [data-file-viewer-root] .\[\&_td\]\:border {
     & td {
-      border-style: var(--tw-border-style);
+      border-style: var(--file-viewer-tw-border-style, solid);
       border-width: 1px;
     }
   }
-  .\[\&_td\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
+  [data-file-viewer-root].\[\&_td\]\:border-\(--file-viewer-border\,\#cbd5e1\),
+  [data-file-viewer-root] .\[\&_td\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
     & td {
       border-color: var(--file-viewer-border,#cbd5e1);
     }
   }
-  .\[\&_td\]\:px-2 {
+  [data-file-viewer-root].\[\&_td\]\:px-2,
+  [data-file-viewer-root] .\[\&_td\]\:px-2 {
     & td {
-      padding-inline: calc(var(--spacing) * 2);
+      padding-inline: calc(var(--file-viewer-spacing, 0.25rem) * 2);
     }
   }
-  .\[\&_td\]\:py-1 {
+  [data-file-viewer-root].\[\&_td\]\:py-1,
+  [data-file-viewer-root] .\[\&_td\]\:py-1 {
     & td {
-      padding-block: calc(var(--spacing) * 1);
+      padding-block: calc(var(--file-viewer-spacing, 0.25rem) * 1);
     }
   }
-  .\[\&_th\]\:border {
+  [data-file-viewer-root].\[\&_th\]\:border,
+  [data-file-viewer-root] .\[\&_th\]\:border {
     & th {
-      border-style: var(--tw-border-style);
+      border-style: var(--file-viewer-tw-border-style, solid);
       border-width: 1px;
     }
   }
-  .\[\&_th\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
+  [data-file-viewer-root].\[\&_th\]\:border-\(--file-viewer-border\,\#cbd5e1\),
+  [data-file-viewer-root] .\[\&_th\]\:border-\(--file-viewer-border\,\#cbd5e1\) {
     & th {
       border-color: var(--file-viewer-border,#cbd5e1);
     }
   }
-  .\[\&_th\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
+  [data-file-viewer-root].\[\&_th\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\),
+  [data-file-viewer-root] .\[\&_th\]\:bg-\(--file-viewer-surface-muted\,\#f8fafc\) {
     & th {
       background-color: var(--file-viewer-surface-muted,#f8fafc);
     }
   }
-  .\[\&_th\]\:px-2 {
+  [data-file-viewer-root].\[\&_th\]\:px-2,
+  [data-file-viewer-root] .\[\&_th\]\:px-2 {
     & th {
-      padding-inline: calc(var(--spacing) * 2);
+      padding-inline: calc(var(--file-viewer-spacing, 0.25rem) * 2);
     }
   }
-  .\[\&_th\]\:py-1 {
+  [data-file-viewer-root].\[\&_th\]\:py-1,
+  [data-file-viewer-root] .\[\&_th\]\:py-1 {
     & th {
-      padding-block: calc(var(--spacing) * 1);
+      padding-block: calc(var(--file-viewer-spacing, 0.25rem) * 1);
     }
   }
-  .\[\&_th\]\:font-semibold {
+  [data-file-viewer-root].\[\&_th\]\:font-semibold,
+  [data-file-viewer-root] .\[\&_th\]\:font-semibold {
     & th {
-      --tw-font-weight: var(--font-weight-semibold);
-      font-weight: var(--font-weight-semibold);
+      --file-viewer-tw-font-weight: var(--file-viewer-font-weight-semibold, 600);
+      font-weight: var(--file-viewer-font-weight-semibold, 600);
     }
   }
-  .\[\&_ul\]\:my-2 {
+  [data-file-viewer-root].\[\&_ul\]\:my-2,
+  [data-file-viewer-root] .\[\&_ul\]\:my-2 {
     & ul {
-      margin-block: calc(var(--spacing) * 2);
+      margin-block: calc(var(--file-viewer-spacing, 0.25rem) * 2);
     }
   }
-  .\[\&_ul\]\:list-disc {
+  [data-file-viewer-root].\[\&_ul\]\:list-disc,
+  [data-file-viewer-root] .\[\&_ul\]\:list-disc {
     & ul {
       list-style-type: disc;
     }
   }
-  .\[\&_ul\]\:pl-6 {
+  [data-file-viewer-root].\[\&_ul\]\:pl-6,
+  [data-file-viewer-root] .\[\&_ul\]\:pl-6 {
     & ul {
-      padding-left: calc(var(--spacing) * 6);
-    }
-  }
-}
-@property --tw-border-style {
-  syntax: "*";
-  inherits: false;
-  initial-value: solid;
-}
-@property --tw-leading {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-ease {
-  syntax: "*";
-  inherits: false;
-}
-@property --tw-font-weight {
-  syntax: "*";
-  inherits: false;
-}
-@layer properties {
-  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
-    *, ::before, ::after, ::backdrop {
-      --tw-border-style: solid;
-      --tw-leading: initial;
-      --tw-ease: initial;
-      --tw-font-weight: initial;
+      padding-left: calc(var(--file-viewer-spacing, 0.25rem) * 6);
     }
   }
 }
@@ -638,7 +677,7 @@
 /* Structural styles required by the CSV Glide Data Grid adapter. The grid's
    library build does not expose its CSS through the package entry, so these
    stable container rules are part of FileViewer's public stylesheet. */
-.gdg-wmyidgi {
+[data-file-viewer-root] .gdg-wmyidgi {
   position: relative;
   min-width: 10px;
   min-height: 10px;
@@ -651,49 +690,49 @@
   direction: ltr;
 }
 
-.gdg-wmyidgi > :first-child {
+[data-file-viewer-root] .gdg-wmyidgi > :first-child {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
 
-.gdg-s1dgczr6 .dvn-scroller {
+[data-file-viewer-root] .gdg-s1dgczr6 .dvn-scroller {
   overflow: var(--s1dgczr6-0);
   transform: translate3d(0, 0, 0);
 }
 
-.gdg-s1dgczr6 .dvn-hidden {
+[data-file-viewer-root] .gdg-s1dgczr6 .dvn-hidden {
   visibility: hidden;
 }
 
-.gdg-s1dgczr6 .dvn-scroll-inner {
+[data-file-viewer-root] .gdg-s1dgczr6 .dvn-scroll-inner {
   display: flex;
   pointer-events: none;
 }
 
-.gdg-s1dgczr6 .dvn-scroll-inner > * {
+[data-file-viewer-root] .gdg-s1dgczr6 .dvn-scroll-inner > * {
   flex-shrink: 0;
 }
 
-.gdg-s1dgczr6 .dvn-scroll-inner .dvn-spacer {
+[data-file-viewer-root] .gdg-s1dgczr6 .dvn-scroll-inner .dvn-spacer {
   flex-grow: 1;
 }
 
-.gdg-s1dgczr6 .dvn-scroll-inner .dvn-stack {
+[data-file-viewer-root] .gdg-s1dgczr6 .dvn-scroll-inner .dvn-stack {
   display: flex;
   flex-direction: column;
 }
 
-.gdg-s1dgczr6 .dvn-underlay > * {
+[data-file-viewer-root] .gdg-s1dgczr6 .dvn-underlay > * {
   position: absolute;
   inset: 0 auto auto 0;
 }
 
-.gdg-s1dgczr6 canvas {
+[data-file-viewer-root] .gdg-s1dgczr6 canvas {
   outline: none;
 }
 
-.gdg-s1dgczr6 canvas * {
+[data-file-viewer-root] .gdg-s1dgczr6 canvas * {
   height: 0;
 }

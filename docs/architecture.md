@@ -134,9 +134,7 @@ The workbook adapter uses the lower-level `XlsxViewer` controller rather than an
 
 The package must not import runtime components from `@mithya/ui-registry` or expect consumers to provide `@mithya/ui-repository` as a component peer dependency.
 
-Right now the package does not ship a separate CSS or token artifact. Styling is handled with Tailwind classes and CSS variable fallbacks in component code. A packaged CSS/tokens output can be added later if needed.
-
-Consumers must configure Tailwind to scan the package source/classes so library classes are emitted in host builds.
+The package ships a compiled `styles.css` artifact containing only FileViewer-root-scoped Tailwind utilities and runtime CSS. Its inline private defaults mean FileViewer does not depend on host Tailwind variables or scan configuration. Consumers may opt into `tailwind-bridge.css`, which maps host tokens only to `--file-viewer-*` variables under the viewer root.
 
 ## Demo App
 

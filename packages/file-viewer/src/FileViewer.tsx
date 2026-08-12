@@ -698,6 +698,7 @@ export function FileViewer({
 
   return (
     <div
+      data-file-viewer-root
       className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded border border-(--file-viewer-border,#cbd5e1) bg-(--file-viewer-surface,#ffffff) ${className ?? ""}`}
     >
       {state.status === "loading" && (

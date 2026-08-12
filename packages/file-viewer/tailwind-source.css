@@ -1,15 +1,2 @@
-/*
- * Optional Tailwind v4 scan entry for @file-viewer/react.
- *
- * Keep this separate from styles.css: styles.css is runtime CSS and must be
- * safe to import from client or SSR global styles without filesystem scanning.
- */
-/* Generated from package source during build; avoids scanning large renderer WASM chunks. */
-@source "./dist/file-viewer-tailwind-content.html";
-
-/* Utilities often composed in JS string constants; dist scan can miss some. */
-@source inline("absolute inset-0 overflow-auto overflow-hidden overflow-x-auto");
-@source inline("whitespace-pre-wrap wrap-break-word break-words");
-@source inline("shrink-0 mx-auto");
-@source inline("relative rounded flex w-full flex-col items-center bg-transparent");
-@source inline("bg-(--file-viewer-surface,#ffffff) [box-shadow:var(--file-viewer-shadow,0_1px_2px_rgb(15_23_42/0.08))]");
+/* @deprecated FileViewer styles are self-contained; import styles.css directly. */
+@import "./styles.css";

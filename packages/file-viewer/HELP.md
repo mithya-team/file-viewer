@@ -120,7 +120,7 @@ Rules like `canvas { width: 100% !important; height: auto !important; }`, `max-w
    @import "@file-viewer/react/styles.css";
    ```
 
-   `styles.css` contains the compiled package utilities and runtime CSS. `tailwind-source.css` is optional if you need to regenerate or customize the utility bundle. Alternatively, manually `@source` the package `dist` plus the safelist in `packages/file-viewer/tailwind-source.css`.
+   `styles.css` contains the compiled package utilities and runtime CSS. It is FileViewer-root-scoped and does not require a package `@source` scan; it cannot change unrelated host Tailwind utilities or tokens. `tailwind-source.css` is a deprecated compatibility alias for this stylesheet.
 
 2. **Size the viewer** per README:
 

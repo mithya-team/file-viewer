@@ -72,21 +72,21 @@ Rationale: Consumers need both user-visible recovery and telemetry hooks.
 
 Consequence: Renderer errors should not be thrown to React error boundaries by default.
 
-### 10. Styling Uses Tailwind And Figma Variables
+### 10. Styling Uses Tailwind And FileViewer-Scoped Variables
 
-Decision: The package uses Tailwind classes and CSS variable fallbacks. A separate packaged CSS/tokens artifact is deferred until there is a concrete need.
+Decision: The package uses Tailwind classes compiled into a packaged stylesheet and `--file-viewer-*` CSS variable fallbacks. Generated selectors and Tailwind implementation properties are scoped to the FileViewer root.
 
 Rationale: This keeps the current package surface smaller while preserving a path to ship shared tokens later if needed.
 
-Consequence: Host apps still own Tailwind scanning. Shared CSS/token packaging stays optional follow-up work, not a current requirement.
+Consequence: Host apps do not scan package code and package styles cannot mutate host Tailwind variables. An optional scoped bridge can map host variables into FileViewer tokens.
 
-### 11. Host Tailwind Scans Library Classes
+### 11. Package Owns Its Tailwind Utility Output
 
-Decision: Consumers must configure Tailwind to scan library source/classes.
+Decision: FileViewer builds a bounded, explicit utility candidate set and ships the compiled result.
 
-Rationale: This keeps Tailwind output aligned with host builds and avoids relying only on precompiled utility CSS.
+Rationale: Serializing all package source made incidental text emit host-colliding utilities. Package-owned output preserves the viewer's layout independently of consumer configuration.
 
-Consequence: The package docs must include consumer Tailwind configuration.
+Consequence: Documentation requires only `@file-viewer/react/styles.css`; `tailwind-source.css` is a deprecated compatibility alias, never a consumer scan entry.
 
 ### 12. Mithya UI Registry Is Dev-Time
 

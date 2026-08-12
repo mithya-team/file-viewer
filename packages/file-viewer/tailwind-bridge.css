@@ -1,0 +1,20 @@
+/* Optional Tailwind v4 bridge. It only assigns FileViewer-private tokens. */
+[data-file-viewer-root] {
+  --file-viewer-font-mono: var(--font-mono, ui-monospace, monospace);
+  --file-viewer-spacing: var(--spacing, 0.25rem);
+  --file-viewer-text-xs: var(--text-xs, 0.75rem);
+  --file-viewer-text-xs-line-height: var(--text-xs--line-height, calc(1 / 0.75));
+  --file-viewer-text-sm: var(--text-sm, 0.875rem);
+  --file-viewer-text-sm-line-height: var(--text-sm--line-height, calc(1.25 / 0.875));
+  --file-viewer-text-lg: var(--text-lg, 1.125rem);
+  --file-viewer-text-lg-line-height: var(--text-lg--line-height, calc(1.75 / 1.125));
+  --file-viewer-text-xl: var(--text-xl, 1.25rem);
+  --file-viewer-text-xl-line-height: var(--text-xl--line-height, calc(1.75 / 1.25));
+  --file-viewer-text-2xl: var(--text-2xl, 1.5rem);
+  --file-viewer-text-2xl-line-height: var(--text-2xl--line-height, calc(2 / 1.5));
+  --file-viewer-font-weight-semibold: var(--font-weight-semibold, 600);
+  --file-viewer-leading-relaxed: var(--leading-relaxed, 1.625);
+  --file-viewer-ease-out: var(--ease-out, cubic-bezier(0, 0, 0.2, 1));
+  --file-viewer-transition-duration: var(--default-transition-duration, 150ms);
+  --file-viewer-transition-timing-function: var(--default-transition-timing-function, cubic-bezier(0.4, 0, 0.2, 1));
+}

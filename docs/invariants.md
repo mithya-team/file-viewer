@@ -80,10 +80,11 @@ This file details what not to do when building this library/package.
 
 ## Styling And Theming
 
-- Must use Tailwind classes.
+- Must use Tailwind classes compiled into a package-owned stylesheet.
 - Must keep theme values behind CSS variables.
 - Must allow host apps to override variables with their own generated CSS.
-- Must document required host Tailwind scanning.
+- Must not require host Tailwind scanning. Shipped utilities and Tailwind implementation properties must be constrained to the FileViewer root, and package CSS must not write Tailwind theme variables to `:root` or `:host`.
+- May expose only `--file-viewer-*` CSS variables for theming; an optional bridge may map host tokens to those variables under the FileViewer root without mutating host tokens.
 - Must not hardcode design-system colors, spacing, radii, or shadows when a token exists.
 - Must not depend on a host app's private global CSS for core layout.
 - Must not write .css files

@@ -29,9 +29,9 @@ Consumer setup requirements:
 - give the viewer a **bounded height** in a flex or grid layout (`min-h-0` on flex ancestors)
 - import the package stylesheet (it includes the compiled package utilities)
 
-### Tailwind
+### Styles and Tailwind
 
-The package ships Tailwind class names in JS; they are not in your app source. The package stylesheet includes the compiled utility set, so consumers do not need to scan package source files.
+The package stylesheet includes a self-contained, FileViewer-root-scoped utility bundle. Consumers do not scan package source, `dist`, or a generated fixture.
 
 **Tailwind v4 (recommended):**
 
@@ -41,27 +41,20 @@ The package ships Tailwind class names in JS; they are not in your app source. T
 @import "@file-viewer/react/styles.css";
 ```
 
-`styles.css` contains compiled package utilities plus runtime CSS and is safe to import from client or SSR global styles. `tailwind-source.css` is an optional Tailwind v4 scan entry for consumers who need to customize or regenerate the package utility set; it scans generated package content plus a small inline safelist for utilities composed in string constants (scrollports and page stacks).
+`styles.css` is safe in Tailwind v4, Tailwind v3, and non-Tailwind hosts. It does not define `:root`/`:host` Tailwind tokens and its utility selectors are constrained to `data-file-viewer-root`, so the import order does not change host `.container`, `.text-sm`, `.p-4`, or host Tailwind variables. Importing Tailwind first remains the conventional order shown above, but is not required for FileViewer isolation.
 
-**Alternative (manual scan only):**
+`tailwind-source.css` remains as a deprecated compatibility alias for `styles.css`; it no longer scans package content.
+
+#### Optional host-token bridge
+
+FileViewer has standalone defaults. To deliberately inherit a Tailwind v4 host's typography and spacing values, import the scoped bridge after `styles.css`:
 
 ```css
-@import "tailwindcss";
-
-@source "../node_modules/@file-viewer/react/dist";
-@source inline("absolute inset-0 overflow-auto overflow-hidden");
+@import "@file-viewer/react/styles.css";
+@import "@file-viewer/react/tailwind-bridge.css";
 ```
 
-If scrollbars or PDF layout look wrong, verify that the package `styles.css` import is present. Use `tailwind-source.css` only when replacing the compiled utility bundle with consumer-managed Tailwind generation.
-
-**Tailwind v3:** add the package bundle to `content`:
-
-```ts
-content: [
-  "./src/**/*.{ts,tsx}",
-  "./node_modules/@file-viewer/react/dist/**/*.{js}",
-];
-```
+The bridge writes only `--file-viewer-*` variables on the viewer root and never changes host tokens. You can set those private variables under your own selector instead when your token names differ.
 
 ### Layout
 
@@ -130,6 +123,7 @@ Current limits:
 - progressive rendering is not supported in v1
 - PDFium WASM is emitted from the installed `@embedpdf/pdfium` dependency by the consumer's Vite build, and its engine worker is bundled with FileViewer; the default PDF renderer does not fetch a CDN, so air-gapped deployments work when normal installed-package assets are available
 - XLSX/XLS uses the lower-level Extend `XlsxViewer` controller, while FileViewer retains workbook sheet chrome; CSV is decoded to text before its client-only grid adapter
+- CSV uses `@glideapps/glide-data-grid@6.0.4-alpha24` intentionally: its stable `6.0.3` release does not declare React 19 support, while FileViewer supports React 18 and 19
 
 ## Detection Contract
 

@@ -11,6 +11,7 @@ const requiredFiles = [
   join(distDir, "file-viewer-tailwind-content.html"),
   join(packageDir, "styles.css"),
   join(packageDir, "tailwind-source.css"),
+  join(packageDir, "tailwind-bridge.css"),
 ];
 
 await Promise.all(requiredFiles.map((path) => access(path)));
@@ -23,8 +24,21 @@ const tailwindSourceStyles = await readFile(
 if (runtimeStyles.includes("@source")) {
   throw new Error("Runtime styles.css must not contain Tailwind @source directives.");
 }
-if (!tailwindSourceStyles.includes("@source")) {
-  throw new Error("Tailwind source stylesheet is missing @source directives.");
+if (tailwindSourceStyles.includes("@source")) {
+  throw new Error("Legacy Tailwind source stylesheet must not scan package content.");
+}
+if (/(:root|:host|--tw-)/.test(runtimeStyles)) {
+  throw new Error("Runtime styles must not mutate host Tailwind theme or implementation variables.");
+}
+if (
+  ["container", "text-sm", "max-w-none", "p-4"].some((utility) =>
+    new RegExp(`^\\s*\\.${utility.replace("-", "\\-")}`, "m").test(runtimeStyles),
+  )
+) {
+  throw new Error("Runtime styles must not emit unscoped generic utility selectors.");
+}
+if (!runtimeStyles.includes("[data-file-viewer-root] .flex")) {
+  throw new Error("Runtime utility selectors must be scoped to FileViewer root.");
 }
 await import(pathToFileURL(join(distDir, "index.js")).href);
 
