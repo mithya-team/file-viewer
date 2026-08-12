@@ -1,7 +1,4 @@
-import { useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeSanitize from "rehype-sanitize";
+import { useEffect, useState, type ComponentType } from "react";
 import { ViewerStatus } from "../primitives/ViewerStatus";
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
@@ -35,9 +32,42 @@ const MARKDOWN_BODY_CLASS = [
   "[&_img]:my-3 [&_img]:max-w-full",
 ].join(" ");
 
+type MarkdownModules = {
+  ReactMarkdown: ComponentType<any>;
+  remarkGfm: unknown;
+  rehypeSanitize: unknown;
+};
+
+function MarkdownContent({ value, modules }: { value: string; modules: MarkdownModules }) {
+  const ReactMarkdown = modules.ReactMarkdown;
+  return (
+    <div className={MARKDOWN_BODY_CLASS}>
+      <ReactMarkdown
+        remarkPlugins={[modules.remarkGfm]}
+        rehypePlugins={[modules.rehypeSanitize]}
+        components={{
+          a: ({ href, children, ...rest }: any) => (
+            <a {...rest} href={href} target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          ),
+          table: ({ children, ...rest }: any) => (
+            <div className="my-3 overflow-x-auto">
+              <table {...rest}>{children}</table>
+            </div>
+          ),
+        }}
+      >
+        {value}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 export function MarkdownRenderer({ blob, onError }: MarkdownRendererProps) {
   const [value, setValue] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [modules, setModules] = useState<MarkdownModules | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -57,31 +87,31 @@ export function MarkdownRenderer({ blob, onError }: MarkdownRendererProps) {
     };
   }, [blob, onError]);
 
+  useEffect(() => {
+    let active = true;
+    void Promise.all([import("react-markdown"), import("remark-gfm"), import("rehype-sanitize")])
+      .then(([reactMarkdown, remarkGfm, rehypeSanitize]) => {
+        if (!active) return;
+        setModules({
+          ReactMarkdown: reactMarkdown.default,
+          remarkGfm: remarkGfm.default,
+          rehypeSanitize: rehypeSanitize.default,
+        });
+      })
+      .catch(() => {
+        if (active) onError(new Error("Failed to load markdown renderer."));
+      });
+    return () => {
+      active = false;
+    };
+  }, [onError]);
+
   return (
     <div className={`${RENDERER_VIEWPORT_CLASS} p-4`} data-renderer="markdown">
-      {isLoading ? (
+      {isLoading || modules == null ? (
         <ViewerStatus>Loading markdown...</ViewerStatus>
       ) : (
-        <div className={MARKDOWN_BODY_CLASS}>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeSanitize]}
-            components={{
-              a: ({ href, children, ...rest }) => (
-                <a {...rest} href={href} target="_blank" rel="noopener noreferrer">
-                  {children}
-                </a>
-              ),
-              table: ({ children, ...rest }) => (
-                <div className="my-3 overflow-x-auto">
-                  <table {...rest}>{children}</table>
-                </div>
-              ),
-            }}
-          >
-            {value}
-          </ReactMarkdown>
-        </div>
+        <MarkdownContent value={value} modules={modules} />
       )}
     </div>
   );

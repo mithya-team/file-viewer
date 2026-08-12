@@ -16,6 +16,17 @@ async function flushEffects() {
   });
 }
 
+async function waitFor<T>(read: () => T | null | undefined): Promise<T> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const value = read();
+    if (value != null) return value;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+  throw new Error("Timed out waiting for markdown renderer.");
+}
+
 describe("MarkdownRenderer", () => {
   let renderer: ReactTestRenderer | undefined;
 
@@ -45,7 +56,10 @@ describe("MarkdownRenderer", () => {
     });
     await flushEffects();
 
-    const root = renderer?.root;
+    const root = await waitFor(() => {
+      const current = renderer?.root;
+      return current?.findAllByType("h1").length ? current : null;
+    });
     expect(root?.findAllByType("h1").some((node) => node.children.includes("Hello"))).toBe(true);
     expect(root?.findAllByType("table").length).toBeGreaterThan(0);
     expect(root?.findAllByType("td").some((node) => node.children.includes("cell"))).toBe(true);
@@ -64,7 +78,10 @@ describe("MarkdownRenderer", () => {
     });
     await flushEffects();
 
-    const root = renderer?.root;
+    const root = await waitFor(() => {
+      const current = renderer?.root;
+      return current?.findAllByType("h1").length ? current : null;
+    });
     expect(root?.findAllByType("script")).toHaveLength(0);
     expect((globalThis as { __md_xss?: number }).__md_xss).toBeUndefined();
     const links = root?.findAllByType("a") ?? [];

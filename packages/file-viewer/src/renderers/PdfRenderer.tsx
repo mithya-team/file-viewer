@@ -1,38 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { EmbedPDF, type PluginBatchRegistrations, useDocumentState } from "@embedpdf/core/react";
 import {
-  GlobalWorkerOptions,
-  getDocument,
-  TextLayer,
-  type PageViewport,
-  type PDFDocumentProxy,
-} from "pdfjs-dist";
-import PdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?worker";
+  DocumentManagerPluginPackage,
+  useDocumentManagerCapability,
+} from "@embedpdf/plugin-document-manager/react";
+import { RenderLayer, RenderPluginPackage } from "@embedpdf/plugin-render/react";
+import { Scroller, ScrollPluginPackage, useScroll } from "@embedpdf/plugin-scroll/react";
+import { SearchLayer, SearchPluginPackage, useSearch } from "@embedpdf/plugin-search/react";
+import { Viewport, ViewportPluginPackage, useViewportScrollActivity } from "@embedpdf/plugin-viewport/react";
+import { ZoomPluginPackage, useZoom } from "@embedpdf/plugin-zoom/react";
+import type { PdfEngine, SearchResult } from "@embedpdf/models";
+import { type MutableRefObject, useEffect, useRef, useState } from "react";
 import { ViewerStatus } from "../primitives/ViewerStatus";
-import {
-  FILE_VIEWER_SEARCH_DEBOUNCE_MS,
-  OBSERVER_MARGIN,
-  PAGE_GAP,
-} from "./pdf/constants";
-import {
-  applyHighlightsForPage,
-  charRangeToStringIndices,
-  clearHitStyles,
-  textLayerStringRuns,
-} from "./pdf/pdfSearchHighlights";
-import { PDF_SEARCH_HIT_CLASS } from "./pdf/searchHighlightColors";
-import { scanPdfMatches } from "./pdf/pdfSearchScan";
-import type { PdfSearchMatch, PdfSearchState } from "./pdf/pdfSearchTypes";
-import { PDF_WORD_SEG_CLASS, wrapPdfTextLayerRunsWithWordSpans } from "./pdf/pdfTextLayerWordSpans";
-import { getPageScrollTopFromSizes } from "./pageScrollTop";
+import type { PdfSearchState } from "./pdf/pdfSearchTypes";
+import { PDF_PAGE_SLOT_CLASS, PDF_SCROLL_ROOT_CLASS } from "./pdf/textLayerTailwind";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./rendererViewport";
-import {
-  PDF_CANVAS_CLASS,
-  PDF_PAGE_COLUMN_CLASS,
-  PDF_PAGE_SLOT_CLASS,
-  PDF_SCROLL_ROOT_CLASS,
-  TEXT_LAYER_CONTAINER_CLASS,
-} from "./pdf/textLayerTailwind";
-import { usePaginatedScrollStack } from "./usePaginatedScrollStack";
+import { loadEmbedPdfEngine } from "./pdf/loadEmbedPdfEngine";
 
 export interface PdfRendererProps {
   blob: Blob;
@@ -51,39 +33,59 @@ export interface PdfRendererProps {
   onRequestPageForSearch?: (page: number) => void;
 }
 
-/** Below this size, persisted/base64 payloads are almost certainly truncated. */
 const MIN_PDF_BYTES = 128;
 
-if (typeof window !== "undefined") {
-  GlobalWorkerOptions.workerPort = new PdfWorker();
-}
+// EmbedPDF treats the plugins array as an initialization dependency. Keep it
+// stable across FileViewer updates so opening a document cannot destroy its
+// registry when page or chrome state changes.
+const PDF_PLUGIN_PACKAGES: PluginBatchRegistrations = [
+  { package: DocumentManagerPluginPackage },
+  { package: ViewportPluginPackage },
+  { package: ScrollPluginPackage },
+  { package: RenderPluginPackage },
+  { package: ZoomPluginPackage, config: { defaultZoomLevel: 1 } },
+  { package: SearchPluginPackage },
+] as never;
 
 function normalizeRenderError(error: unknown): Error {
   if (error instanceof Error) return error;
   return new Error("Failed to render PDF.");
 }
 
-async function loadPdfDocument(blob: Blob): Promise<PDFDocumentProxy> {
+async function assertPdfBlob(blob: Blob) {
   if (blob.size < MIN_PDF_BYTES) {
     throw new Error("PDF data is too small or incomplete.");
   }
 
   const header = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
-  if (
-    header[0] !== 0x25
-    || header[1] !== 0x50
-    || header[2] !== 0x44
-    || header[3] !== 0x46
-  ) {
+  if (header[0] !== 0x25 || header[1] !== 0x50 || header[2] !== 0x44 || header[3] !== 0x46) {
     throw new Error("Invalid PDF data.");
   }
-
-  const data = await blob.arrayBuffer();
-  const loadingTask = getDocument({ data });
-  return loadingTask.promise;
 }
 
-export function PdfRenderer({
+type PdfDocumentSurfaceProps = Omit<PdfRendererProps, "blob" | "pageCount"> & {
+  blob: Blob;
+};
+
+type PdfCallbackRefs = {
+  onError: MutableRefObject<(error: Error) => void>;
+  onPageCountChange: MutableRefObject<(pageCount: number) => void>;
+  onGeometryReadyChange: MutableRefObject<PdfRendererProps["onGeometryReadyChange"]>;
+  onVisiblePageChange: MutableRefObject<PdfRendererProps["onVisiblePageChange"]>;
+  onProgrammaticPageNavigateSettled: MutableRefObject<
+    PdfRendererProps["onProgrammaticPageNavigateSettled"]
+  >;
+  onSearchStateChange: MutableRefObject<PdfRendererProps["onSearchStateChange"]>;
+  onRequestPageForSearch: MutableRefObject<PdfRendererProps["onRequestPageForSearch"]>;
+};
+
+type PdfDocumentViewportProps = Omit<PdfDocumentSurfaceProps, "blob" | "onError" | "onPageCountChange" | "onGeometryReadyChange" | "onVisiblePageChange" | "onProgrammaticPageNavigateSettled" | "onSearchStateChange" | "onRequestPageForSearch"> & {
+  callbacks: PdfCallbackRefs;
+  documentId: string;
+  lastIntentRef: MutableRefObject<number>;
+};
+
+function PdfDocumentSurface({
   blob,
   page,
   navIntent = 0,
@@ -97,401 +99,247 @@ export function PdfRenderer({
   activeMatchIndex = 0,
   onSearchStateChange,
   onRequestPageForSearch,
-}: PdfRendererProps) {
-  const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
-  const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
-  const textLayerContainerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const textLayerByPageRef = useRef<Map<number, TextLayer>>(new Map());
-  const searchMatchesRef = useRef<PdfSearchMatch[]>([]);
-  const activeMatchIdxRef = useRef(0);
-  const pageStringsRef = useRef<Map<number, string[]>>(new Map());
-  const searchAbortRef = useRef<AbortController | null>(null);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const renderingRef = useRef<Set<number>>(new Set());
-  const renderedScaleRef = useRef<Map<number, number>>(new Map());
-
+}: PdfDocumentSurfaceProps) {
+  const { provides: documentManager } = useDocumentManagerCapability();
+  const [documentId, setDocumentId] = useState<string | null>(null);
+  const lastIntentRef = useRef(navIntent);
+  const generationRef = useRef(0);
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
   const onGeometryReadyChangeRef = useRef(onGeometryReadyChange);
+  const onVisiblePageChangeRef = useRef(onVisiblePageChange);
+  const onProgrammaticPageNavigateSettledRef = useRef(onProgrammaticPageNavigateSettled);
   const onSearchStateChangeRef = useRef(onSearchStateChange);
   const onRequestPageForSearchRef = useRef(onRequestPageForSearch);
+  const zoomRef = useRef(zoom);
+  const callbacksRef = useRef<PdfCallbackRefs>({
+    onError: onErrorRef,
+    onPageCountChange: onPageCountChangeRef,
+    onGeometryReadyChange: onGeometryReadyChangeRef,
+    onVisiblePageChange: onVisiblePageChangeRef,
+    onProgrammaticPageNavigateSettled: onProgrammaticPageNavigateSettledRef,
+    onSearchStateChange: onSearchStateChangeRef,
+    onRequestPageForSearch: onRequestPageForSearchRef,
+  });
 
   onErrorRef.current = onError;
   onPageCountChangeRef.current = onPageCountChange;
   onGeometryReadyChangeRef.current = onGeometryReadyChange;
+  onVisiblePageChangeRef.current = onVisiblePageChange;
+  onProgrammaticPageNavigateSettledRef.current = onProgrammaticPageNavigateSettled;
   onSearchStateChangeRef.current = onSearchStateChange;
   onRequestPageForSearchRef.current = onRequestPageForSearch;
-
-  const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
-  const [numPages, setNumPages] = useState(0);
-  const [pageSizes, setPageSizes] = useState<Map<number, { w: number; h: number }>>(
-    () => new Map(),
-  );
-  const [searchMatches, setSearchMatches] = useState<PdfSearchMatch[]>([]);
-  const renderPageRef = useRef<((pageNum: number) => void) | null>(null);
-
-  searchMatchesRef.current = searchMatches;
-  activeMatchIdxRef.current = activeMatchIndex;
-
-  const isDocumentLoading = pdfDocument == null;
-  const searchActive = searchQuery.trim().length > 0;
-
-  const getEffectiveScale = useCallback(() => zoom / 100, [zoom]);
-
-  const getPageScrollTop = useCallback(
-    (targetPage: number) =>
-      getPageScrollTopFromSizes(targetPage, pageSizes, getEffectiveScale(), PAGE_GAP),
-    [getEffectiveScale, pageSizes],
-  );
-
-  const { scrollRef } = usePaginatedScrollStack({
-    numPages,
-    isDocumentLoading,
-    page,
-    navIntent,
-    layoutKey: zoom,
-    onVisiblePageChange,
-    onPageNearViewport: (pageNum) => {
-      renderPageRef.current?.(pageNum);
-    },
-    getPageScrollTop,
-    onProgrammaticPageNavigateSettled,
-  });
-
-  const reapplyAllHighlights = useCallback(() => {
-    if (!searchActive) return;
-    textLayerByPageRef.current.forEach((layer, pageNum) => {
-      const strings = pageStringsRef.current.get(pageNum);
-      applyHighlightsForPage(
-        pageNum,
-        layer,
-        strings,
-        searchMatchesRef.current,
-        activeMatchIdxRef.current,
-      );
-    });
-  }, [searchActive]);
-
-  const renderTextLayerForPage = useCallback(
-    async (
-      pageNum: number,
-      pdfPage: Awaited<ReturnType<PDFDocumentProxy["getPage"]>>,
-      viewport: PageViewport,
-    ): Promise<boolean> => {
-      const container = textLayerContainerRefs.current.get(pageNum);
-      if (!container) return false;
-
-      const scale = getEffectiveScale();
-      const prev = textLayerByPageRef.current.get(pageNum);
-      prev?.cancel();
-
-      container.replaceChildren();
-      container.style.setProperty("--scale-factor", String(scale));
-
-      let textContent: Awaited<ReturnType<typeof pdfPage.getTextContent>>;
-      try {
-        textContent = await pdfPage.getTextContent();
-      } catch {
-        return false;
-      }
-
-      const textLayer = new TextLayer({
-        textContentSource: textContent,
-        container,
-        viewport,
-      });
-      textLayerByPageRef.current.set(pageNum, textLayer);
-      try {
-        await textLayer.render();
-      } catch {
-        return false;
-      }
-
-      if (searchActive) {
-        wrapPdfTextLayerRunsWithWordSpans(
-          textLayer.textDivs as unknown as HTMLElement[],
-        );
-        const strings = pageStringsRef.current.get(pageNum);
-        applyHighlightsForPage(
-          pageNum,
-          textLayer,
-          strings,
-          searchMatchesRef.current,
-          activeMatchIdxRef.current,
-        );
-      }
-      return true;
-    },
-    [getEffectiveScale, searchActive],
-  );
-
-  const renderPage = useCallback(
-    (pageNum: number) => {
-      const doc = pdfDocRef.current;
-      const canvas = canvasRefs.current.get(pageNum);
-      if (!doc || !canvas || renderingRef.current.has(pageNum)) return;
-
-      const scale = getEffectiveScale();
-      if (renderedScaleRef.current.get(pageNum) === scale) return;
-
-      renderingRef.current.add(pageNum);
-
-      void doc
-        .getPage(pageNum)
-        .then((pdfPage) => {
-          const viewport = pdfPage.getViewport({ scale });
-          const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-
-          canvas.width = Math.floor(viewport.width * dpr);
-          canvas.height = Math.floor(viewport.height * dpr);
-          canvas.style.width = `${viewport.width}px`;
-          canvas.style.height = `${viewport.height}px`;
-
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            renderingRef.current.delete(pageNum);
-            return;
-          }
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-          return pdfPage.render({ canvasContext: ctx, viewport }).promise.then(async () => {
-            const textLayerReady = await renderTextLayerForPage(pageNum, pdfPage, viewport);
-            if (textLayerReady) {
-              renderedScaleRef.current.set(pageNum, scale);
-            }
-            renderingRef.current.delete(pageNum);
-          });
-        })
-        .catch((error) => {
-          renderingRef.current.delete(pageNum);
-          onErrorRef.current(normalizeRenderError(error));
-        });
-    },
-    [getEffectiveScale, renderTextLayerForPage],
-  );
-
-  renderPageRef.current = renderPage;
-
-  const renderVisiblePages = useCallback(() => {
-    const container = scrollRef.current;
-    if (!container || isDocumentLoading) return;
-    const wrappers = Array.from(
-      container.querySelectorAll<HTMLElement>("[data-page-num]"),
-    );
-    const containerRect = container.getBoundingClientRect();
-    wrappers.forEach((wrapper) => {
-      const pageNum = Number(wrapper.dataset.pageNum);
-      if (!pageNum) return;
-      const rect = wrapper.getBoundingClientRect();
-      const inViewport =
-        rect.bottom >= containerRect.top - OBSERVER_MARGIN
-        && rect.top <= containerRect.bottom + OBSERVER_MARGIN;
-      if (inViewport) renderPage(pageNum);
-    });
-  }, [isDocumentLoading, renderPage]);
+  zoomRef.current = zoom;
 
   useEffect(() => {
-    let active = true;
-    let loadedDocument: PDFDocumentProxy | null = null;
-    setPdfDocument(null);
-    setNumPages(0);
-    setPageSizes(new Map());
+    if (documentManager == null) return;
+    let disposed = false;
+    let openedDocumentId: string | null = null;
+    const nextDocumentId = `file-viewer-pdf-${++generationRef.current}`;
+
     onGeometryReadyChangeRef.current?.(false);
-    renderedScaleRef.current.clear();
-    renderingRef.current.clear();
-    setSearchMatches([]);
-    pageStringsRef.current = new Map();
-    textLayerByPageRef.current.forEach((layer) => layer.cancel());
-    textLayerByPageRef.current.clear();
-
-    void loadPdfDocument(blob)
-      .then(async (document) => {
-        if (!active) {
-          void document.destroy();
-          return;
-        }
-        pdfDocRef.current = document;
-        loadedDocument = document;
-        setPdfDocument(document);
-        setNumPages(document.numPages);
-        onPageCountChangeRef.current(document.numPages);
-
-        const sizes = new Map<number, { w: number; h: number }>();
-        for (let p = 1; p <= document.numPages; p++) {
-          const pg = await document.getPage(p);
-          const vp = pg.getViewport({ scale: 1 });
-          sizes.set(p, { w: vp.width, h: vp.height });
-        }
-        if (!active) return;
-        setPageSizes(sizes);
+    setDocumentId(null);
+    lastIntentRef.current = navIntent;
+    void blob
+      .arrayBuffer()
+      .then((buffer) =>
+        documentManager
+          .openDocumentBuffer({
+            buffer,
+            name: "document.pdf",
+            documentId: nextDocumentId,
+            autoActivate: true,
+            scale: zoomRef.current / 100,
+          })
+          .toPromise(),
+      )
+      .then((response) => {
+        openedDocumentId = response.documentId;
+        return response.task.toPromise();
+      })
+      .then((document) => {
+        if (disposed) return;
+        if (document.pageCount < 1) throw new Error("PDF has no pages.");
+        setDocumentId(openedDocumentId ?? nextDocumentId);
+        onPageCountChangeRef.current(document.pageCount);
         onGeometryReadyChangeRef.current?.(true);
       })
       .catch((error) => {
-        if (!active) return;
-        onErrorRef.current(normalizeRenderError(error));
+        if (!disposed) onErrorRef.current(normalizeRenderError(error));
       });
 
     return () => {
-      active = false;
-      setPdfDocument(null);
-      pdfDocRef.current = null;
+      disposed = true;
       onGeometryReadyChangeRef.current?.(false);
-      if (loadedDocument != null) {
-        void loadedDocument.destroy();
-      }
-      textLayerByPageRef.current.forEach((layer) => layer.cancel());
-      textLayerByPageRef.current.clear();
-    };
-  }, [blob]);
-
-  useEffect(() => {
-    if (isDocumentLoading) return;
-    renderedScaleRef.current.clear();
-    renderingRef.current.clear();
-    textLayerByPageRef.current.forEach((layer) => layer.cancel());
-    textLayerByPageRef.current.clear();
-  }, [isDocumentLoading, zoom]);
-
-  useEffect(() => {
-    if (isDocumentLoading || numPages === 0) return;
-    const id = requestAnimationFrame(() => {
-      renderVisiblePages();
-    });
-    return () => cancelAnimationFrame(id);
-  }, [isDocumentLoading, numPages, pageSizes, zoom, renderVisiblePages]);
-
-  useEffect(() => {
-    reapplyAllHighlights();
-  }, [searchMatches, activeMatchIndex, reapplyAllHighlights]);
-
-  useEffect(() => {
-    const doc = pdfDocRef.current;
-    if (!doc || isDocumentLoading) return;
-
-    const q = searchQuery.trim();
-    if (!q) {
-      searchAbortRef.current?.abort();
-      searchAbortRef.current = null;
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-        searchDebounceRef.current = null;
-      }
-      pageStringsRef.current = new Map();
-      setSearchMatches([]);
-      onSearchStateChangeRef.current?.({ totalMatches: 0, isSearching: false });
-      textLayerByPageRef.current.forEach((layer) => {
-        clearHitStyles(layer);
-      });
-      renderVisiblePages();
-      return;
-    }
-
-    onSearchStateChangeRef.current?.({ totalMatches: 0, isSearching: true });
-
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      searchAbortRef.current?.abort();
-      const ac = new AbortController();
-      searchAbortRef.current = ac;
-
-      void (async () => {
-        try {
-          const { matches, pageStrings } = await scanPdfMatches(doc, q, ac.signal);
-          if (ac.signal.aborted) return;
-          pageStringsRef.current = pageStrings;
-          setSearchMatches(matches);
-          onSearchStateChangeRef.current?.({
-            totalMatches: matches.length,
-            isSearching: false,
-          });
-          renderedScaleRef.current.clear();
-          textLayerByPageRef.current.forEach((layer) => layer.cancel());
-          textLayerByPageRef.current.clear();
-          renderVisiblePages();
-        } catch (e) {
-          if ((e as Error).name === "AbortError") return;
-          onSearchStateChangeRef.current?.({ totalMatches: 0, isSearching: false });
-        }
-      })();
-    }, FILE_VIEWER_SEARCH_DEBOUNCE_MS);
-
-    return () => {
-      searchAbortRef.current?.abort();
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-        searchDebounceRef.current = null;
+      if (openedDocumentId != null) {
+        documentManager.closeDocument(openedDocumentId).wait(() => undefined, () => undefined);
       }
     };
-  }, [searchQuery, blob, isDocumentLoading, renderVisiblePages]);
+  }, [blob, documentManager]);
 
-  useEffect(() => {
-    if (!searchMatches.length || activeMatchIndex < 0) return;
-    const m = searchMatches[Math.min(activeMatchIndex, searchMatches.length - 1)];
-    if (!m) return;
-    if (m.pageNum !== page) {
-      onRequestPageForSearchRef.current?.(m.pageNum);
-    }
-    const layer = textLayerByPageRef.current.get(m.pageNum);
-    const fallback = pageStringsRef.current.get(m.pageNum);
-    const runs = layer ? textLayerStringRuns(layer, fallback) : fallback;
-    if (!layer || !runs?.length) return;
-    const idxs = charRangeToStringIndices(runs, m.start, m.end);
-    const div = layer.textDivs[idxs[0]];
-    const innerHit = div?.querySelector<HTMLElement>(
-      `.${PDF_WORD_SEG_CLASS}.${PDF_SEARCH_HIT_CLASS}`,
-    );
-    (innerHit ?? div)?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [activeMatchIndex, page, searchMatches]);
-
-  if (isDocumentLoading) {
-    return (
-      <div className={RENDERER_VIEWPORT_CENTERED_CLASS}>
-        <ViewerStatus>Loading PDF...</ViewerStatus>
-      </div>
-    );
+  if (documentId == null) {
+    return <div className={RENDERER_VIEWPORT_CENTERED_CLASS}><ViewerStatus>Loading PDF...</ViewerStatus></div>;
   }
 
-  const scale = getEffectiveScale();
+  return (
+    <PdfDocumentViewport
+      callbacks={callbacksRef.current}
+      documentId={documentId}
+      lastIntentRef={lastIntentRef}
+      page={page}
+      navIntent={navIntent}
+      zoom={zoom}
+      searchQuery={searchQuery}
+      activeMatchIndex={activeMatchIndex}
+    />
+  );
+}
+
+function PdfDocumentViewport({
+  activeMatchIndex = 0,
+  callbacks,
+  documentId,
+  lastIntentRef,
+  navIntent = 0,
+  page,
+  searchQuery = "",
+  zoom,
+}: PdfDocumentViewportProps) {
+  const documentState = useDocumentState(documentId);
+  const scroll = useScroll(documentId);
+  const zoomControl = useZoom(documentId);
+  const search = useSearch(documentId);
+  const scrollActivity = useViewportScrollActivity(documentId);
+  const latestNavigationRef = useRef<{ intent: number; page: number } | null>(null);
+
+  useEffect(() => {
+    if (documentState?.document == null) return;
+    callbacks.onPageCountChange.current(documentState.document.pageCount);
+  }, [callbacks, documentState?.document]);
+
+  useEffect(() => {
+    if (scroll.provides == null) return;
+    return scroll.provides.onPageChange((event) => {
+      callbacks.onVisiblePageChange.current?.(event.pageNumber);
+    });
+  }, [callbacks, scroll.provides]);
+
+  useEffect(() => {
+    if (scroll.provides == null) return;
+    if (navIntent === lastIntentRef.current) return;
+    lastIntentRef.current = navIntent;
+    const targetPage = Math.max(1, Math.min(page, scroll.state.totalPages || page));
+    latestNavigationRef.current = { intent: navIntent, page: targetPage };
+    scroll.provides.scrollToPage({
+      pageNumber: targetPage,
+      behavior: "smooth",
+      alignY: 0,
+    });
+  }, [lastIntentRef, navIntent, page, scroll.provides, scroll.state.totalPages]);
+
+  useEffect(() => {
+    const pending = latestNavigationRef.current;
+    if (pending == null || scrollActivity.isScrolling || scrollActivity.isSmoothScrolling) return;
+    if (scroll.state.currentPage !== pending.page) return;
+    const frame = requestAnimationFrame(() => {
+      const current = latestNavigationRef.current;
+      if (current?.intent !== pending.intent || current.page !== pending.page) return;
+      latestNavigationRef.current = null;
+      callbacks.onProgrammaticPageNavigateSettled.current?.(pending.page);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [callbacks, scroll.state.currentPage, scrollActivity.isScrolling, scrollActivity.isSmoothScrolling]);
+
+  useEffect(() => {
+    if (zoomControl.provides == null) return;
+    zoomControl.provides.requestZoom(zoom / 100);
+  }, [zoom, zoomControl.provides]);
+
+  useEffect(() => {
+    if (search.provides == null) return;
+    const query = searchQuery.trim();
+    if (query.length === 0) {
+      search.provides.stopSearch();
+      callbacks.onSearchStateChange.current?.({ totalMatches: 0, isSearching: false });
+      return;
+    }
+    search.provides.startSearch();
+    search.provides.searchAllPages(query).wait(
+      () => undefined,
+      (error) => callbacks.onError.current(normalizeRenderError(error)),
+    );
+  }, [callbacks, search.provides, searchQuery]);
+
+  useEffect(() => {
+    callbacks.onSearchStateChange.current?.({
+      totalMatches: search.state.total,
+      isSearching: search.state.loading,
+    });
+  }, [callbacks, search.state.loading, search.state.total]);
+
+  useEffect(() => {
+    if (search.provides == null || search.state.total < 1) return;
+    const matchIndex = Math.max(0, Math.min(activeMatchIndex, search.state.total - 1));
+    search.provides.goToResult(matchIndex);
+    const result = search.state.results[matchIndex] as SearchResult | undefined;
+    if (result != null) callbacks.onRequestPageForSearch.current?.(result.pageIndex + 1);
+  }, [activeMatchIndex, callbacks, search.provides, search.state.results, search.state.total]);
 
   return (
-    <div ref={scrollRef} className={PDF_SCROLL_ROOT_CLASS}>
-      <div
-        className={PDF_PAGE_COLUMN_CLASS}
-        style={{ gap: `var(--file-viewer-page-gap, ${PAGE_GAP}px)` }}
-      >
-        {Array.from({ length: numPages }, (_, i) => {
-          const pageNum = i + 1;
-          const sz = pageSizes.get(pageNum);
-          const scaledW = sz ? sz.w * scale : 0;
-          const scaledH = sz ? sz.h * scale : 0;
-          return (
-            <div
-              key={pageNum}
-              data-page-num={pageNum}
-              style={{
-                width: scaledW || undefined,
-                height: scaledH || undefined,
-              }}
-              className={PDF_PAGE_SLOT_CLASS}
-            >
-              <canvas
-                className={PDF_CANVAS_CLASS}
-                ref={(el) => {
-                  if (el) canvasRefs.current.set(pageNum, el);
-                  else canvasRefs.current.delete(pageNum);
-                }}
-              />
-              <div
-                className={TEXT_LAYER_CONTAINER_CLASS}
-                ref={(el) => {
-                  if (el) textLayerContainerRefs.current.set(pageNum, el);
-                  else textLayerContainerRefs.current.delete(pageNum);
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <Viewport documentId={documentId} className={PDF_SCROLL_ROOT_CLASS}>
+      <Scroller
+        documentId={documentId}
+        renderPage={({ pageIndex }) => (
+          <div className={PDF_PAGE_SLOT_CLASS} data-file-viewer-pdf-page={pageIndex + 1}>
+            <RenderLayer documentId={documentId} pageIndex={pageIndex} />
+            <SearchLayer documentId={documentId} pageIndex={pageIndex} />
+          </div>
+        )}
+      />
+    </Viewport>
+  );
+}
+
+/** Internal EmbedPDF adapter; FileViewer remains the sole chrome surface. */
+export function PdfRenderer(props: PdfRendererProps) {
+  const [engine, setEngine] = useState<PdfEngine<Blob> | null>(null);
+  const [isValid, setIsValid] = useState(false);
+  const onErrorRef = useRef(props.onError);
+  onErrorRef.current = props.onError;
+
+  useEffect(() => {
+    let disposed = false;
+    setEngine(null);
+    setIsValid(false);
+    void assertPdfBlob(props.blob)
+      .then(() => loadEmbedPdfEngine())
+      .then((nextEngine) => {
+        if (!disposed) {
+          setIsValid(true);
+          setEngine(nextEngine);
+        }
+      })
+      .catch((error) => {
+        if (!disposed) onErrorRef.current(normalizeRenderError(error));
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [props.blob]);
+
+  if (!isValid || engine == null) {
+    return <div className={RENDERER_VIEWPORT_CENTERED_CLASS}><ViewerStatus>Loading PDF...</ViewerStatus></div>;
+  }
+
+  // EmbedPDF's plugin package generics are invariant in v2.14.4, while its
+  // public batch-registration type intentionally accepts heterogeneous plugins.
+  return (
+    <EmbedPDF
+      engine={engine}
+      autoMountDomElements={false}
+      plugins={PDF_PLUGIN_PACKAGES}
+    >
+      <PdfDocumentSurface {...props} />
+    </EmbedPDF>
   );
 }

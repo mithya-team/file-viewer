@@ -199,7 +199,7 @@ export async function detectFileKind(blob: Blob): Promise<DetectionResult> {
   const sampleLength = Math.min(blob.size, 1024 * 256);
   const sampleBuffer = await blob.slice(0, sampleLength).arrayBuffer();
   const sampleBytes = new Uint8Array(sampleBuffer);
-  const normalizedMime = blob.type.toLowerCase();
+  const normalizedMime = blob.type.toLowerCase().split(";", 1)[0]?.trim() ?? "";
 
   if (startsWith(sampleBytes, [0x25, 0x50, 0x44, 0x46])) {
     return { kind: "pdf", mimeType: normalizedMime || "application/pdf" };

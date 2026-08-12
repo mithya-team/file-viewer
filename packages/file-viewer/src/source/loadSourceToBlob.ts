@@ -15,18 +15,105 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
+function createAbortError(): DOMException {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+type SharedUrlLoad = {
+  abortController: AbortController;
+  consumers: number;
+  promise: Promise<Blob>;
+  settled: boolean;
+};
+
+/**
+ * React development Strict Mode temporarily tears down URL consumers before
+ * mounting their replacement. Keep one in-flight read per URL through that
+ * same turn so the cleanup cannot cancel the replacement's source request.
+ */
+const sharedUrlLoads = new Map<string, SharedUrlLoad>();
+
+function createSharedUrlLoad(value: string): SharedUrlLoad {
+  const abortController = new AbortController();
+  const shared: SharedUrlLoad = {
+    abortController,
+    consumers: 0,
+    promise: Promise.resolve(new Blob()),
+    settled: false,
+  };
+
+  shared.promise = fetch(value, { signal: abortController.signal }).then((response) => {
+    if (!response.ok) {
+      throw new Error(`Failed to load source URL (${response.status}).`);
+    }
+    return response.blob();
+  });
+  void shared.promise.then(
+    () => {
+      shared.settled = true;
+      if (sharedUrlLoads.get(value) === shared) sharedUrlLoads.delete(value);
+    },
+    () => {
+      shared.settled = true;
+      if (sharedUrlLoads.get(value) === shared) sharedUrlLoads.delete(value);
+    },
+  );
+  sharedUrlLoads.set(value, shared);
+  return shared;
+}
+
+function getSharedUrlLoad(value: string): SharedUrlLoad {
+  const existing = sharedUrlLoads.get(value);
+  if (existing != null && !existing.abortController.signal.aborted) return existing;
+  return createSharedUrlLoad(value);
+}
+
+function loadSharedUrlSource(value: string, signal: AbortSignal): Promise<Blob> {
+  if (signal.aborted) return Promise.reject(createAbortError());
+
+  const shared = getSharedUrlLoad(value);
+  shared.consumers += 1;
+
+  return new Promise<Blob>((resolve, reject) => {
+    let finished = false;
+
+    const release = () => {
+      shared.consumers = Math.max(0, shared.consumers - 1);
+      if (shared.consumers !== 0 || shared.settled) return;
+      queueMicrotask(() => {
+        if (shared.consumers === 0 && !shared.settled) {
+          shared.abortController.abort();
+        }
+      });
+    };
+
+    const finish = (callback: () => void) => {
+      if (finished) return;
+      finished = true;
+      signal.removeEventListener("abort", onAbort);
+      release();
+      callback();
+    };
+
+    const onAbort = () => {
+      finish(() => reject(createAbortError()));
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    shared.promise.then(
+      (blob) => finish(() => resolve(blob)),
+      (error) => finish(() => reject(error)),
+    );
+  });
+}
+
 async function loadStringSource(value: string, signal: AbortSignal): Promise<Blob> {
   const kind = classifyStringSource(value);
   switch (kind) {
     case "data-url":
     case "object-url":
-    case "http-url": {
-      const response = await fetch(value, { signal });
-      if (!response.ok) {
-        throw new Error(`Failed to load source URL (${response.status}).`);
-      }
-      return response.blob();
-    }
+    case "http-url":
+      return loadSharedUrlSource(value, signal);
     case "base64":
       return new Blob([toArrayBuffer(decodeBase64ToBytes(value))]);
     default: {

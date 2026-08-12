@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import * as XLSX from "xlsx";
+import { useEffect, useRef, useState } from "react";
 import { ViewerStatus } from "../primitives/ViewerStatus";
+import { CsvRenderer } from "./CsvRenderer";
 import { RENDERER_VIEWPORT_CLASS } from "./rendererViewport";
 
 export interface SpreadsheetRendererProps {
@@ -10,75 +10,115 @@ export interface SpreadsheetRendererProps {
   onSheetNamesChange: (sheetNames: string[]) => void;
 }
 
-type SheetData = {
-  name: string;
-  rows: string[][];
-};
-
-function parseWorkbook(buffer: ArrayBuffer) {
-  const workbook = XLSX.read(buffer, { type: "array" });
-  return workbook.SheetNames.map((name) => {
-    const worksheet = workbook.Sheets[name];
-    const rawRows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
-      header: 1,
-      blankrows: false,
-    });
-    const rows = rawRows.map((row) => row.map((cell) => (cell == null ? "" : String(cell))));
-    return { name, rows };
-  });
+interface WorkbookViewerProps {
+  data: ArrayBuffer;
+  activeSheetIndex: number;
+  onError: (error: Error) => void;
+  onSheetNamesChange: (sheetNames: string[]) => void;
 }
 
-export function SpreadsheetRenderer({
-  blob,
+type XlsxModule = typeof import("@extend-ai/react-xlsx");
+
+/** The primitive stays headless: FileViewer owns all workbook chrome. */
+function WorkbookViewerClient({
+  data,
   activeSheetIndex,
   onError,
   onSheetNamesChange,
-}: SpreadsheetRendererProps) {
-  const [sheets, setSheets] = useState<SheetData[]>([]);
+  xlsx,
+}: WorkbookViewerProps & { xlsx: XlsxModule }) {
+  const controller = xlsx.useXlsxViewerController({
+    file: data,
+    fileName: "workbook.xlsx",
+    readOnly: true,
+    useWorker: true,
+  });
+  const lastSheetNamesRef = useRef("");
 
   useEffect(() => {
-    let active = true;
-    blob
-      .arrayBuffer()
-      .then((buffer) => {
-        if (!active) return;
-        const nextSheets = parseWorkbook(buffer);
-        setSheets(nextSheets);
-        onSheetNamesChange(nextSheets.map((sheet) => sheet.name));
-      })
-      .catch(() => {
-        if (!active) return;
-        onSheetNamesChange([]);
-        onError(new Error("Failed to parse spreadsheet."));
-      });
-    return () => {
-      active = false;
-    };
-  }, [blob, onError, onSheetNamesChange]);
+    if (controller.error != null) onError(controller.error);
+  }, [controller.error, onError]);
 
-  if (sheets.length === 0) return <ViewerStatus>Loading spreadsheet...</ViewerStatus>;
+  useEffect(() => {
+    const sheetNames = controller.sheets.map((sheet) => sheet.name);
+    const sheetKey = sheetNames.join("\u0000");
+    if (sheetKey === lastSheetNamesRef.current) return;
+    lastSheetNamesRef.current = sheetKey;
+    onSheetNamesChange(sheetNames);
+  }, [controller.revision, controller.sheets, onSheetNamesChange]);
 
-  const activeSheet = sheets[Math.min(activeSheetIndex, sheets.length - 1)];
-  const maxColumns = activeSheet.rows.reduce((max, row) => Math.max(max, row.length), 0);
+  useEffect(() => {
+    if (controller.sheets.length === 0) return;
+    controller.setActiveSheetIndex(
+      Math.max(0, Math.min(activeSheetIndex, controller.sheets.length - 1)),
+    );
+  }, [activeSheetIndex, controller.setActiveSheetIndex, controller.sheets.length]);
 
   return (
-    <div className={`${RENDERER_VIEWPORT_CLASS} p-3`}>
-      <table className="w-full border-collapse text-left text-xs">
-        <tbody>
-          {activeSheet.rows.map((row, rowIndex) => (
-            <tr key={`${activeSheet.name}-${rowIndex}`}>
-              {Array.from({ length: maxColumns }, (_, colIndex) => (
-                <td
-                  key={colIndex}
-                  className="border px-2 py-1 align-top [border-color:var(--file-viewer-border,_#cbd5e1)] [color:var(--file-viewer-foreground,_#334155)]"
-                >
-                  {row[colIndex] ?? ""}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className={`${RENDERER_VIEWPORT_CLASS} min-h-0`}>
+      <xlsx.XlsxViewer
+        controller={controller}
+        experimentalCanvas
+        readOnly
+        showDefaultToolbar={false}
+        showImages
+      />
     </div>
+  );
+}
+
+/** Loads the browser-only workbook implementation only after mount. */
+function WorkbookViewer(props: WorkbookViewerProps) {
+  const [xlsx, setXlsx] = useState<XlsxModule | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    void import("@extend-ai/react-xlsx").then(
+      (module) => {
+        if (!disposed) setXlsx(module);
+      },
+      (error) => {
+        if (!disposed) props.onError(error instanceof Error ? error : new Error("Failed to load spreadsheet viewer."));
+      },
+    );
+    return () => {
+      disposed = true;
+    };
+  }, [props.onError]);
+
+  if (xlsx == null) return <ViewerStatus>Loading spreadsheet...</ViewerStatus>;
+  return <WorkbookViewerClient {...props} xlsx={xlsx} />;
+}
+
+export function SpreadsheetRenderer({ blob, activeSheetIndex, onError, onSheetNamesChange }: SpreadsheetRendererProps) {
+  const isCsv = blob.type.toLowerCase().split(";", 1)[0]?.trim() === "text/csv";
+  const [data, setData] = useState<ArrayBuffer | null>(null);
+
+  useEffect(() => {
+    if (isCsv) return;
+    let disposed = false;
+    setData(null);
+    void blob.arrayBuffer().then(
+      (buffer) => {
+        if (!disposed) setData(buffer);
+      },
+      (error) => {
+        if (!disposed) onError(error instanceof Error ? error : new Error("Failed to read spreadsheet."));
+      },
+    );
+    return () => {
+      disposed = true;
+    };
+  }, [blob, isCsv, onError]);
+
+  if (isCsv) return <CsvRenderer blob={blob} onError={onError} />;
+  if (data == null) return <ViewerStatus>Loading spreadsheet...</ViewerStatus>;
+  return (
+    <WorkbookViewer
+      data={data}
+      activeSheetIndex={activeSheetIndex}
+      onError={onError}
+      onSheetNamesChange={onSheetNamesChange}
+    />
   );
 }

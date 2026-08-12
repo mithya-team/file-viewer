@@ -19,7 +19,7 @@ Peer dependencies:
 
 Package name:
 
-The package ships built JS/types plus its packaged PDF worker. Do not import from package `src` or copy worker files into app `public`.
+The package ships built JS/types and references the installed PDFium WASM plus engine worker through bundler-managed URLs. Do not import from package `src` or copy renderer assets into app `public`.
 
 ## Quickstart
 
@@ -41,7 +41,7 @@ The package ships Tailwind class names in JS; they are not in your app source. I
 @import "@file-viewer/react/styles.css";
 ```
 
-`@file-viewer/react/styles.css` scans `dist` plus a small inline safelist for utilities composed in string constants (scrollports, PDF text layer, etc.).
+`@file-viewer/react/styles.css` scans `dist` plus a small inline safelist for utilities composed in string constants (scrollports and page stacks).
 
 **Alternative (manual scan only):**
 
@@ -116,7 +116,7 @@ Supported file families:
 - PDF
 - spreadsheets: XLSX, XLS, CSV
 - Word documents: DOCX, DOTX
-- presentations: PPTX, POTX (static slide preview via pinned Pagus `@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`)
+- presentations: PPTX, POTX (static continuous preview via pinned `@extend-ai/react-pptx@0.1.2`; vendor toolbar, thumbnail rail, notes, and diagnostics are disabled)
 - markdown when MIME is `text/markdown` or `text/x-markdown` (GFM preview; sanitized). Default chrome offers **Preview | Source** (source = plain monospace via the text renderer). Servers that send `.md` as `text/plain` stay on the text path unless the blob/header MIME is corrected.
 - HTML when MIME is `text/html`: detected as `html`, but iframe preview is **opt-in** via `enableHtmlPreview` (default `false` → text fallback). When enabled, default chrome offers **Preview | Source** (source = plain monospace; preview = sandboxed iframe with `allow-scripts` and **without** `allow-same-origin`). When preview is disabled, there is no toggle — text path only. Enable only for content you trust — author scripts execute and may fetch remote images/CSS/fonts. `application/xhtml+xml` is not HTML in v1.
 - text when MIME indicates text, including `text/plain`, other `text/*` values except `text/csv`, markdown MIME, and `text/html` above, `application/json`, `application/xml`, and `application/javascript`
@@ -128,6 +128,8 @@ Current limits:
 - markdown remote images may be fetched by the browser from URLs in the document; the package does not proxy them
 - HTML preview (when `enableHtmlPreview`) may fetch remote subresources from the document; the package does not rewrite or block them
 - progressive rendering is not supported in v1
+- PDFium WASM is emitted from the installed `@embedpdf/pdfium` dependency by the consumer's Vite build, and its engine worker is bundled with FileViewer; the default PDF renderer does not fetch a CDN, so air-gapped deployments work when normal installed-package assets are available
+- XLSX/XLS uses the lower-level Extend `XlsxViewer` controller, while FileViewer retains workbook sheet chrome; CSV is decoded to text before its client-only grid adapter
 
 ## Detection Contract
 

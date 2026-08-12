@@ -11,7 +11,7 @@ Supported v1 formats:
 - Markdown: `text/markdown` and `text/x-markdown` via internal `MarkdownRenderer` (GFM + sanitize). Unlabeled markdown-looking blobs stay unsupported.
 - HTML: `text/html` via internal `HtmlRenderer` only when `enableHtmlPreview` is true (sandboxed iframe with `allow-scripts`, no `allow-same-origin`). Default falls back to text renderer. No xhtml MIME in v1.
 
-`pptx` / `potx` use internal `PptxRenderer` on **[Pagus](https://github.com/pagus-kit/Pagus)** (`@pagus-kit/core` + `@pagus-kit/renderer`, pinned at `0.1.1`). Buffered `Blob` → `parse` → per-slide `renderSlide` SVG inside package chrome. Static preview only.
+The document adapters use pinned Extend rendering primitives behind the package boundary: EmbedPDF with package-owned PDFium for PDF, `@extend-ai/react-docx` for DOCX/DOTX, `@extend-ai/react-xlsx` for XLSX/XLS, and `@extend-ai/react-pptx` for PPTX/POTX. PPTX is a static continuous preview with vendor toolbar, thumbnails, notes, and diagnostics disabled; FileViewer chrome remains the only control surface.
 
 ## Package Shape
 
@@ -102,7 +102,7 @@ Renderers share a common internal contract:
 - integrate with shared viewer state where relevant
 - render fallback/error states through the package shell
 
-PDF, spreadsheet, and Word parsing use package-owned bundler-managed workers where worker support is needed. Workers are referenced with package-relative module URLs so consumers do not copy public worker files.
+PDFium WASM is emitted by the consumer's Vite build from the installed PDFium package, while its engine worker is package-owned. The PDF adapter resolves those local assets and disables EmbedPDF fallback-font networking, so the default renderer needs no CDN and works in an air-gapped deployment after normal package assets are served. XLSX/DOCX workers are bundler-managed by their adapters. The browser-only CSV grid and its vendor CSS are dynamically loaded together after mount, so no consumer `public`-asset or global CSS import step is required.
 
 `dotx` uses the DOCX rendering path. Template metadata/actions are not executed.
 
@@ -127,6 +127,8 @@ When `api.file.kind === "spreadsheet"`, custom chrome should branch on `api.file
 
 - `text/csv` has no workbook-level controls
 - workbook-only controls like `sheetNames`, `activeSheetIndex`, and `setActiveSheetIndex` are only meaningful for non-CSV spreadsheet formats
+
+The workbook adapter uses the lower-level `XlsxViewer` controller rather than an Extend viewer shell. FileViewer owns sheet names and active-sheet chrome, so consumer sheet commands remain bidirectional.
 
 `@mithya/ui-registry` is a dev-time generator/CLI, not a runtime component library. The package should use the registry to generate or copy the needed design-system primitives into `packages/file-viewer/src`, then ship those primitives as package code.
 
@@ -159,6 +161,7 @@ The demo should exercise:
 - ReadableStream source
 - Error/unsupported state
 - built package artifact shape expected by consumers
+- external PDF/PPTX page commands, including early and same-page commands through the citation-scroll route
 
 ### Demo Source Preparation Flow
 

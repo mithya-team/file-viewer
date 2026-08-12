@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectFileKind } from "../src/detect/detectFileKind";
 
-function zipEntries(entries: Array<{ name: string; data?: string | Uint8Array }>): Uint8Array {
+function zipEntries(entries: Array<{ name: string; data?: string | Uint8Array }>): ArrayBuffer {
   const parts: Uint8Array[] = [];
   for (const entry of entries) {
     const nameBytes = new TextEncoder().encode(entry.name);
@@ -29,7 +29,7 @@ function zipEntries(entries: Array<{ name: string; data?: string | Uint8Array }>
     out.set(part, offset);
     offset += part.length;
   }
-  return out;
+  return out.buffer;
 }
 
 describe("detectFileKind", () => {
@@ -71,6 +71,12 @@ describe("detectFileKind", () => {
     const blob = new Blob(["col1,col2\n1,2\n"], { type: "text/csv" });
     const result = await detectFileKind(blob);
     expect(result.kind).toBe("spreadsheet");
+  });
+
+  it("detects CSV when a loaded MIME includes charset parameters", async () => {
+    const blob = new Blob(["col1,col2\n1,2\n"], { type: "text/csv;charset=utf-8" });
+    const result = await detectFileKind(blob);
+    expect(result).toEqual({ kind: "spreadsheet", mimeType: "text/csv" });
   });
 
   it("detects dotx through the docx path", async () => {

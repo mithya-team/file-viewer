@@ -7,7 +7,9 @@ import {
 } from "../src";
 import type {
   DetectionResult,
+  HtmlChromeApi,
   ImageChromeApi,
+  MarkdownChromeApi,
   PDFChromeApi,
   SpreadsheetChromeApi,
 } from "../src/types";
@@ -262,6 +264,12 @@ describe("FileViewer", () => {
     };
   const isImageChromeApi = (api: FileViewerChromeApi): api is ImageChromeApi => {
     return api.file.kind === "image";
+  };
+  const isMarkdownChromeApi = (api: FileViewerChromeApi): api is MarkdownChromeApi => {
+    return api.file.kind === "markdown";
+  };
+  const isHtmlChromeApi = (api: FileViewerChromeApi): api is HtmlChromeApi => {
+    return api.file.kind === "html";
   };
 
 
@@ -1086,7 +1094,7 @@ describe("FileViewer", () => {
     let latestApi: FileViewerChromeApi | null = null;
     function MarkdownChrome({ api }: { api: FileViewerChromeApi }) {
       latestApi = api;
-      if (api.file.kind !== "markdown") {
+      if (!isMarkdownChromeApi(api)) {
         return <div data-chrome-kind={api.file.kind}>{api.file.kind}</div>;
       }
       return (
@@ -1105,9 +1113,10 @@ describe("FileViewer", () => {
     await waitFor(
       () => renderer?.root.findAllByProps({ "data-chrome-kind": "markdown" })[0] ?? null,
     );
-    expect(latestApi?.file.kind).toBe("markdown");
-    if (latestApi?.file.kind === "markdown") {
-      expect(latestApi.markdown.viewMode).toBe("preview");
+    const markdownApi = latestApi as MarkdownChromeApi | null;
+    expect(markdownApi?.file.kind).toBe("markdown");
+    if (markdownApi != null) {
+      expect(markdownApi.markdown.viewMode).toBe("preview");
     }
 
     const goSource = findAllByText(renderer, "Go source")[0];
@@ -1118,8 +1127,9 @@ describe("FileViewer", () => {
     await waitFor(
       () => renderer?.root.findAllByProps({ "data-renderer": "text" })[0] ?? null,
     );
-    if (latestApi?.file.kind === "markdown") {
-      expect(latestApi.markdown.viewMode).toBe("source");
+    const updatedMarkdownApi = latestApi as MarkdownChromeApi | null;
+    if (updatedMarkdownApi != null) {
+      expect(updatedMarkdownApi.markdown.viewMode).toBe("source");
     }
   });
 
@@ -1142,9 +1152,10 @@ describe("FileViewer", () => {
     await waitFor(
       () => renderer?.root.findAllByProps({ "data-chrome-kind": "html" })[0] ?? null,
     );
-    expect(latestApi?.file.kind).toBe("html");
-    if (latestApi?.file.kind === "html") {
-      expect(latestApi.html).toBeUndefined();
+    const htmlApi = latestApi as HtmlChromeApi | null;
+    expect(htmlApi?.file.kind).toBe("html");
+    if (htmlApi != null) {
+      expect(htmlApi.html).toBeUndefined();
     }
   });
 

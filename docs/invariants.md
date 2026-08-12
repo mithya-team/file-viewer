@@ -45,8 +45,8 @@ This file details what not to do when building this library/package.
 - Must render `dotx` through the DOCX path only.
 - Must render `potx` through the PPTX path only.
 - Must not execute template behavior, embedded actions, macros, scripts, or external document side effects.
-- Must use pinned Pagus packages (`@pagus-kit/core@0.1.1`, `@pagus-kit/renderer@0.1.1`) and an internal `PptxRenderer` — not `@pagus-kit/react`.
-- Must keep PPTX as static preview only (no animations, editing, or presenter mode).
+- Must use the pinned Extend rendering primitives through internal adapters: EmbedPDF plus local `@embedpdf/pdfium`, `@extend-ai/react-docx@0.8.2`, `@extend-ai/react-xlsx@0.16.1`, and `@extend-ai/react-pptx@0.1.2`. Must not import a copied Extend UI registry viewer shell as a runtime dependency.
+- Must configure PPTX as static continuous preview with its vendor toolbar, thumbnail rail, notes, and diagnostics disabled (no animations, editing, or presenter mode).
 
 ## Renderer Boundaries
 
@@ -54,6 +54,7 @@ This file details what not to do when building this library/package.
 - Must keep renderer inputs normalized.
 - Must route loading, ready, error, page, zoom, and search state through the package shell.
 - Must not let each renderer invent separate public state APIs.
+- PDF and PPTX page commands from package chrome must control the underlying continuous scroll surface, including same-page re-jumps and latest-request-wins settlement events.
 - Must not throw renderer failures by default.
 - Must call `onError` and show fallback UI for detection/render failures.
 - Must support `renderFallback` for unsupported/error states.
@@ -64,6 +65,8 @@ This file details what not to do when building this library/package.
 - Must reference workers with package-relative module URLs.
 - Must not require consumers to copy worker files into `public`.
 - Must not hardcode worker paths like `/pdf.worker.js`, `/csvWorker.js`, or `/excelWorker.js`.
+- Must resolve PDFium WASM and its engine worker through installed-package, bundler-managed assets; the default PDF path must not fetch a CDN or require a consumer `public` copy step.
+- Must load browser-only CSV grid code only after client mount so importing the package remains SSR-safe.
 - Must not bundle React or ReactDOM.
 
 ## Mithya UI Registry
@@ -93,6 +96,7 @@ This file details what not to do when building this library/package.
 - Must copy existing `sample-files`; do not move or delete originals.
 - Must not generate missing format fixtures unless explicitly approved.
 - Must demonstrate URL, Blob, base64, stream, and error/unsupported flows.
+- Must demonstrate external PDF and PPTX `setPage` commands, including an early command and same-page re-cite.
 - Must validate the built artifact shape consumers are expected to install, not only workspace-linked source behavior.
 
 ## Reference Files
