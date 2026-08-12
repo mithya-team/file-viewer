@@ -27,11 +27,11 @@ Consumer setup requirements:
 
 - render `FileViewer` in client/browser runtime (e.g. `"use client"` in Next.js)
 - give the viewer a **bounded height** in a flex or grid layout (`min-h-0` on flex ancestors)
-- configure Tailwind to scan package utilities (see below)
+- import the package stylesheet (it includes the compiled package utilities)
 
 ### Tailwind
 
-The package ships Tailwind class names in JS; they are not in your app source. Import the package scan entry from your global CSS.
+The package ships Tailwind class names in JS; they are not in your app source. The package stylesheet includes the compiled utility set, so consumers do not need to scan package source files.
 
 **Tailwind v4 (recommended):**
 
@@ -41,7 +41,7 @@ The package ships Tailwind class names in JS; they are not in your app source. I
 @import "@file-viewer/react/styles.css";
 ```
 
-`@file-viewer/react/styles.css` scans `dist` plus a small inline safelist for utilities composed in string constants (scrollports and page stacks).
+`styles.css` contains compiled package utilities plus runtime CSS and is safe to import from client or SSR global styles. `tailwind-source.css` is an optional Tailwind v4 scan entry for consumers who need to customize or regenerate the package utility set; it scans generated package content plus a small inline safelist for utilities composed in string constants (scrollports and page stacks).
 
 **Alternative (manual scan only):**
 
@@ -52,7 +52,7 @@ The package ships Tailwind class names in JS; they are not in your app source. I
 @source inline("absolute inset-0 overflow-auto overflow-hidden");
 ```
 
-If scrollbars or PDF layout look wrong, you are likely missing utilities — use `@import "@file-viewer/react/styles.css"` instead.
+If scrollbars or PDF layout look wrong, verify that the package `styles.css` import is present. Use `tailwind-source.css` only when replacing the compiled utility bundle with consumer-managed Tailwind generation.
 
 **Tailwind v3:** add the package bundle to `content`:
 

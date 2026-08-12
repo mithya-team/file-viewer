@@ -56,7 +56,7 @@ export const PDF_CANVAS_CLASS =
 
 ### 1. Missing package Tailwind scan (most common)
 
-Demo imports the package stylesheet:
+Demo imports the package stylesheet, which now includes the compiled package utilities:
 
 ```1:2:apps/demo/src/styles.css
 @import "tailwindcss";
@@ -120,7 +120,7 @@ Rules like `canvas { width: 100% !important; height: auto !important; }`, `max-w
    @import "@file-viewer/react/styles.css";
    ```
 
-   Or manually `@source` the package `dist` plus the safelist in `packages/file-viewer/styles.css`.
+   `styles.css` contains the compiled package utilities and runtime CSS. `tailwind-source.css` is optional if you need to regenerate or customize the utility bundle. Alternatively, manually `@source` the package `dist` plus the safelist in `packages/file-viewer/tailwind-source.css`.
 
 2. **Size the viewer** per README:
 

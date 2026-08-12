@@ -8,6 +8,7 @@
   "files": [
     "dist",
     "styles.css",
+    "tailwind-source.css",
     "README.md",
     "package.json"
   ],
@@ -18,10 +19,11 @@
       "default": "./dist/index.js"
     },
     "./styles.css": "./styles.css",
+    "./tailwind-source.css": "./tailwind-source.css",
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build:artifact": "vite build && tsc -p tsconfig.build.json && node scripts/generate-tailwind-content.mjs",
+    "build:artifact": "vite build && tsc -p tsconfig.build.json && node scripts/generate-tailwind-content.mjs && node scripts/generate-package-styles.mjs",
     "build": "npm run build:artifact",
     "prepare": "npm run build:artifact",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -53,12 +55,15 @@
     "react-dom": "^18.2.0 || ^19.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/node": "4.3.0",
+    "@tailwindcss/oxide": "4.3.0",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "@types/react-test-renderer": "^19.1.0",
     "@types/papaparse": "^5.3.16",
     "happy-dom": "^17.4.4",
     "react-test-renderer": "^19.2.6",
+    "tailwindcss": "4.3.0",
     "typescript": "^5.8.3",
     "vite": "^6.4.2",
     "vitest": "^3.2.4"

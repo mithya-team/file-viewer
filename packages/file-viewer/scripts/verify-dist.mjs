@@ -9,9 +9,23 @@ const requiredFiles = [
   join(distDir, "index.js"),
   join(distDir, "index.d.ts"),
   join(distDir, "file-viewer-tailwind-content.html"),
+  join(packageDir, "styles.css"),
+  join(packageDir, "tailwind-source.css"),
 ];
 
 await Promise.all(requiredFiles.map((path) => access(path)));
+
+const runtimeStyles = await readFile(join(packageDir, "styles.css"), "utf8");
+const tailwindSourceStyles = await readFile(
+  join(packageDir, "tailwind-source.css"),
+  "utf8",
+);
+if (runtimeStyles.includes("@source")) {
+  throw new Error("Runtime styles.css must not contain Tailwind @source directives.");
+}
+if (!tailwindSourceStyles.includes("@source")) {
+  throw new Error("Tailwind source stylesheet is missing @source directives.");
+}
 await import(pathToFileURL(join(distDir, "index.js")).href);
 
 const assetFiles = await readdir(join(distDir, "assets"));
