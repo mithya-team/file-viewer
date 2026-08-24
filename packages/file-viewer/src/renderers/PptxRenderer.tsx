@@ -8,6 +8,7 @@ import "@extend-ai/react-pptx/styles.css";
 import { useEffect, useRef, useState } from "react";
 import { ViewerStatus } from "../primitives/ViewerStatus";
 import { PDF_SCROLL_ROOT_CLASS } from "./pdf/textLayerTailwind";
+import { normalizePptxCharacterReferences } from "./pptx/normalizePptxCharacterReferences";
 import { RENDERER_VIEWPORT_CENTERED_CLASS } from "./rendererViewport";
 
 export interface PptxRendererProps {
@@ -52,6 +53,7 @@ export function PptxRenderer({
   } | null>(null);
   const [controllerReady, setControllerReady] = useState(false);
   const [presentationLoaded, setPresentationLoaded] = useState(false);
+  const [source, setSource] = useState<Blob | ArrayBuffer | null>(null);
   const onErrorRef = useRef(onError);
   const onPageCountChangeRef = useRef(onPageCountChange);
   const onGeometryReadyChangeRef = useRef(onGeometryReadyChange);
@@ -76,6 +78,29 @@ export function PptxRenderer({
     pendingNavigationRef.current = null;
     lastIntentRef.current = navIntent;
     onGeometryReadyChangeRef.current?.(false);
+  }, [blob]);
+
+  // Extend renders bullet `char` numeric character references (e.g.
+  // `&#x2022;`) verbatim, so normalize them out of the OOXML before the
+  // vendor viewer parses the bytes. Any failure falls back to the original
+  // blob so rendering degrades to the vendor default rather than breaking.
+  useEffect(() => {
+    let disposed = false;
+    setSource(null);
+    void blob
+      .arrayBuffer()
+      .then(normalizePptxCharacterReferences)
+      .then(
+        (buffer) => {
+          if (!disposed) setSource(buffer);
+        },
+        () => {
+          if (!disposed) setSource(blob);
+        },
+      );
+    return () => {
+      disposed = true;
+    };
   }, [blob]);
 
   useEffect(() => {
@@ -151,10 +176,18 @@ export function PptxRenderer({
     if (error != null) onErrorRef.current(error);
   };
 
+  if (source == null) {
+    return (
+      <div className={RENDERER_VIEWPORT_CENTERED_CLASS}>
+        <ViewerStatus>Loading presentation...</ViewerStatus>
+      </div>
+    );
+  }
+
   return (
     <div className={PDF_SCROLL_ROOT_CLASS}>
       <ReactPptxViewer
-        source={blob}
+        source={source}
         slideIndex={Math.max(0, page - 1)}
         mode="continuous"
         zoom={zoom}
