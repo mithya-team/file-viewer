@@ -2,6 +2,13 @@ const LOCAL_FILE_HEADER = 0x04034b50;
 const CENTRAL_DIRECTORY_HEADER = 0x02014b50;
 const END_OF_CENTRAL_DIRECTORY = 0x06054b50;
 
+// Ceiling on total inflated bytes per archive. Normalization only needs to
+// walk an Office package's entries, so a real document stays well under this,
+// while a deflate bomb (attacker-authored deck opened by a victim) is refused
+// before it can exhaust the browser tab's memory. On overflow readZipEntries
+// throws and callers fall back to the original bytes.
+const DEFAULT_MAX_INFLATED_BYTES = 512 * 1024 * 1024;
+
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
 
@@ -58,22 +65,48 @@ function crc32(bytes: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-async function inflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
+async function inflateRaw(bytes: Uint8Array, maxBytes: number): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") {
     throw new Error("This browser cannot normalize compressed Office entries.");
   }
   const stream = new Blob([bytes as BlobPart])
     .stream()
     .pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > maxBytes) {
+        throw new Error("Office ZIP entry exceeds the inflation limit.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
 }
 
 /**
  * Read every local file entry of an OOXML (ZIP) archive, inflating deflated
  * members so callers can inspect and rewrite decompressed bytes.
  */
-export async function readZipEntries(bytes: Uint8Array): Promise<ZipEntry[]> {
+export async function readZipEntries(
+  bytes: Uint8Array,
+  maxInflatedBytes = DEFAULT_MAX_INFLATED_BYTES,
+): Promise<ZipEntry[]> {
   const entries: ZipEntry[] = [];
+  let inflatedBudget = maxInflatedBytes;
   let offset = 0;
   while (offset + 4 <= bytes.length && readU32(bytes, offset) === LOCAL_FILE_HEADER) {
     const method = readU16(bytes, offset + 8);
@@ -88,10 +121,14 @@ export async function readZipEntries(bytes: Uint8Array): Promise<ZipEntry[]> {
       method === 0
         ? new Uint8Array(compressed)
         : method === 8
-          ? await inflateRaw(compressed)
+          ? await inflateRaw(compressed, inflatedBudget)
           : (() => {
               throw new Error(`Unsupported Office ZIP compression method: ${method}`);
             })();
+    inflatedBudget -= entryBytes.length;
+    if (inflatedBudget < 0) {
+      throw new Error("Office ZIP archive exceeds the inflation limit.");
+    }
     entries.push({ name, bytes: entryBytes });
     offset = dataStart + compressedSize;
   }
