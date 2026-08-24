@@ -18,10 +18,23 @@ const STRUCTURAL_CODE_POINTS = new Set([0x22, 0x26, 0x27, 0x3c, 0x3e]);
 
 const NUMERIC_CHARACTER_REFERENCE = /&#(x[0-9a-f]+|[0-9]+);/gi;
 
+/** XML 1.0 `Char` production. Decoding a forbidden code point would make the part unparseable. */
+function isXml10Char(codePoint: number): boolean {
+  return (
+    codePoint === 0x9 ||
+    codePoint === 0xa ||
+    codePoint === 0xd ||
+    (codePoint >= 0x20 && codePoint <= 0xd7ff) ||
+    (codePoint >= 0xe000 && codePoint <= 0xfffd) ||
+    (codePoint >= 0x10000 && codePoint <= 0x10ffff)
+  );
+}
+
 /**
  * Replace numeric character references (e.g. `&#x2022;`) with the literal
  * characters they denote. Named references (`&amp;`, `&lt;`, ...) and any
- * reference that resolves to an XML-structural character are left untouched.
+ * reference that resolves to an XML-structural or XML 1.0-illegal character
+ * are left untouched.
  */
 function decodeNumericCharacterReferences(xml: string): string {
   return xml.replace(NUMERIC_CHARACTER_REFERENCE, (match, body: string) => {
@@ -33,6 +46,7 @@ function decodeNumericCharacterReferences(xml: string): string {
       return match;
     }
     if (STRUCTURAL_CODE_POINTS.has(codePoint)) return match;
+    if (!isXml10Char(codePoint)) return match;
     try {
       return String.fromCodePoint(codePoint);
     } catch {

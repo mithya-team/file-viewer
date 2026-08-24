@@ -12,7 +12,19 @@ vi.mock("@extend-ai/react-pptx", () => ({
   },
 }));
 
+import {
+  readZipEntries,
+  writeZipEntries,
+} from "../src/renderers/office/officeZipArchive";
 import { PptxRenderer } from "../src/renderers/PptxRenderer";
+
+function pptxBlobWithEncodedBullet(): Blob {
+  const xml = new TextEncoder().encode('<a:pPr><a:buChar char="&#x2022;"/></a:pPr>');
+  const buffer = writeZipEntries([{ name: "ppt/slides/slide1.xml", bytes: xml }]);
+  return new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  });
+}
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean | undefined;
@@ -146,5 +158,31 @@ describe("PptxRenderer", () => {
       behavior: "smooth",
       block: "start",
     });
+  });
+
+  it("passes rewritten bytes when slide parts contain encoded bullets", async () => {
+    const blob = pptxBlobWithEncodedBullet();
+
+    await act(async () => {
+      renderer = create(
+        <PptxRenderer
+          blob={blob}
+          page={1}
+          zoom={100}
+          onError={vi.fn()}
+          onPageCountChange={vi.fn()}
+        />,
+      );
+    });
+
+    const source = pptxViewerState.props?.source as ArrayBuffer;
+    expect(source).toBeInstanceOf(ArrayBuffer);
+    expect(source).not.toBe(blob);
+    const entries = await readZipEntries(new Uint8Array(source));
+    const slide = new TextDecoder().decode(
+      entries.find((entry) => entry.name === "ppt/slides/slide1.xml")!.bytes,
+    );
+    expect(slide).toContain('char="•"');
+    expect(slide).not.toContain("&#x2022;");
   });
 });

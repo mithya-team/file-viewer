@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   readZipEntries,
@@ -5,6 +7,11 @@ import {
   type ZipEntry,
 } from "../src/renderers/office/officeZipArchive";
 import { normalizePptxCharacterReferences } from "../src/renderers/pptx/normalizePptxCharacterReferences";
+
+const WAYGROUND_PPTX = resolve(
+  import.meta.dirname,
+  "../../../sample-files/Wayground_CSM_Assignment_Slides.pptx",
+);
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -84,5 +91,45 @@ describe("normalizePptxCharacterReferences", () => {
     const output = await normalizePptxCharacterReferences(input);
 
     expect(output).toBe(input);
+  });
+
+  it("leaves XML 1.0-illegal numeric references encoded", async () => {
+    const xml =
+      '<a:t>&#x0; &#x8; &#xB; &#xC; &#x1F; &#xFFFE; &#xD800;</a:t><a:buChar char="&#x2022;"/>';
+    const input = buildPptx({ "ppt/slides/slide1.xml": xml });
+
+    const output = await normalizePptxCharacterReferences(input);
+    const slide = await readPart(output, "ppt/slides/slide1.xml");
+
+    expect(slide).toContain("&#x0;");
+    expect(slide).toContain("&#x8;");
+    expect(slide).toContain("&#xB;");
+    expect(slide).toContain("&#xC;");
+    expect(slide).toContain("&#x1F;");
+    expect(slide).toContain("&#xFFFE;");
+    expect(slide).toContain("&#xD800;");
+    expect(slide).toContain('char="•"');
+    expect(slide).not.toContain("\u0000");
+  });
+
+  it("decodes encoded bullets in the reported Wayground deck", async () => {
+    const bytes = readFileSync(WAYGROUND_PPTX);
+    const input = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const output = await normalizePptxCharacterReferences(input);
+    const before = await readZipEntries(new Uint8Array(input));
+    const after = await readZipEntries(new Uint8Array(output));
+
+    expect(after.map((entry) => entry.name)).toEqual(before.map((entry) => entry.name));
+
+    const slide11Before = decoder.decode(
+      before.find((entry) => entry.name === "ppt/slides/slide11.xml")!.bytes,
+    );
+    const slide11After = decoder.decode(
+      after.find((entry) => entry.name === "ppt/slides/slide11.xml")!.bytes,
+    );
+
+    expect(slide11Before).toContain('char="&#x2022;"');
+    expect(slide11After).toContain('char="•"');
+    expect(slide11After).not.toContain("&#x2022;");
   });
 });
