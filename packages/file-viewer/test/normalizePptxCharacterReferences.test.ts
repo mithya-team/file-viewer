@@ -148,6 +148,23 @@ describe("normalizePptxCharacterReferences", () => {
     expect(slide).toContain("• item"); // the bullet still decodes
   });
 
+  it("keeps control and format references encoded to prevent display spoofing", async () => {
+    const xml =
+      '<a:t>&#x202E; rtl &#x200B; zwsp &#x80; c1 &#xFEFF; bom &#x2022; bullet</a:t>';
+    const input = buildPptx({ "ppt/slides/slide1.xml": xml });
+
+    const output = await normalizePptxCharacterReferences(input);
+    const slide = await readPart(output, "ppt/slides/slide1.xml");
+
+    expect(slide).toContain("&#x202E;"); // RIGHT-TO-LEFT OVERRIDE (bidi)
+    expect(slide).toContain("&#x200B;"); // ZERO WIDTH SPACE
+    expect(slide).toContain("&#x80;"); // C1 control
+    expect(slide).toContain("&#xFEFF;"); // ZERO WIDTH NO-BREAK SPACE
+    expect(slide).toContain("• bullet"); // visible glyph still decodes
+    expect(slide).not.toContain(String.fromCodePoint(0x202e));
+    expect(slide).not.toContain(String.fromCodePoint(0x200b));
+  });
+
   it("applies the fix to a slide written with a streaming data descriptor", async () => {
     const archive = await buildZipFixture([
       {

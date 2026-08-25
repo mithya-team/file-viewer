@@ -11,10 +11,12 @@ const NORMALIZED_PART = /^ppt\/(slides|slideLayouts|slideMasters|notesSlides|not
 // stay encoded, otherwise decoding them would corrupt the document markup.
 const STRUCTURAL_CODE_POINTS = new Set([0x22, 0x26, 0x27, 0x3c, 0x3e]);
 
-// Whitespace control references (tab, LF, CR) must also stay encoded: inside an
-// attribute value XML normalization would fold them to spaces, silently
-// changing values such as `descr` alt text.
-const WHITESPACE_CODE_POINTS = new Set([0x9, 0xa, 0xd]);
+// Control (`Cc`, incl. tab/LF/CR and C1) and format (`Cf`, incl. bidi overrides
+// and zero-width) code points stay encoded. Decoding them would be invisible in
+// the rendered slide yet could reorder or spoof displayed text, and whitespace
+// controls inside an attribute value would be folded to spaces. Bullet glyphs
+// are symbols/punctuation, so they are unaffected.
+const CONTROL_OR_FORMAT = /[\p{Cc}\p{Cf}]/u;
 
 const NUMERIC_CHARACTER_REFERENCE = /&#(x[0-9a-f]+|[0-9]+);/gi;
 
@@ -33,8 +35,8 @@ function isXml10Char(codePoint: number): boolean {
 /**
  * Replace numeric character references (e.g. `&#x2022;`) with the literal
  * characters they denote. Named references (`&amp;`, `&lt;`, ...) and any
- * reference that resolves to an XML-structural or XML 1.0-illegal character
- * are left untouched.
+ * reference that resolves to an XML-structural, XML 1.0-illegal, or
+ * control/format character are left untouched.
  */
 function decodeNumericCharacterReferences(xml: string): string {
   return xml.replace(NUMERIC_CHARACTER_REFERENCE, (match, body: string) => {
@@ -46,13 +48,10 @@ function decodeNumericCharacterReferences(xml: string): string {
       return match;
     }
     if (STRUCTURAL_CODE_POINTS.has(codePoint)) return match;
-    if (WHITESPACE_CODE_POINTS.has(codePoint)) return match;
     if (!isXml10Char(codePoint)) return match;
-    try {
-      return String.fromCodePoint(codePoint);
-    } catch {
-      return match;
-    }
+    const char = String.fromCodePoint(codePoint);
+    if (CONTROL_OR_FORMAT.test(char)) return match;
+    return char;
   });
 }
 
