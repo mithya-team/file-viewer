@@ -1,9 +1,4 @@
-import {
-  officeZipTextDecoder as textDecoder,
-  officeZipTextEncoder as textEncoder,
-  readZipEntries,
-  writeZipEntries,
-} from "../office/officeZipArchive";
+import { transformOfficeZipParts } from "../office/officeZipArchive";
 
 /**
  * XML parts whose rendered text and bullet definitions reach Extend's slide
@@ -15,6 +10,11 @@ const NORMALIZED_PART = /^ppt\/(slides|slideLayouts|slideMasters|notesSlides|not
 // Numeric character references that resolve to XML-structural characters must
 // stay encoded, otherwise decoding them would corrupt the document markup.
 const STRUCTURAL_CODE_POINTS = new Set([0x22, 0x26, 0x27, 0x3c, 0x3e]);
+
+// Whitespace control references (tab, LF, CR) must also stay encoded: inside an
+// attribute value XML normalization would fold them to spaces, silently
+// changing values such as `descr` alt text.
+const WHITESPACE_CODE_POINTS = new Set([0x9, 0xa, 0xd]);
 
 const NUMERIC_CHARACTER_REFERENCE = /&#(x[0-9a-f]+|[0-9]+);/gi;
 
@@ -46,6 +46,7 @@ function decodeNumericCharacterReferences(xml: string): string {
       return match;
     }
     if (STRUCTURAL_CODE_POINTS.has(codePoint)) return match;
+    if (WHITESPACE_CODE_POINTS.has(codePoint)) return match;
     if (!isXml10Char(codePoint)) return match;
     try {
       return String.fromCodePoint(codePoint);
@@ -65,16 +66,8 @@ function decodeNumericCharacterReferences(xml: string): string {
 export async function normalizePptxCharacterReferences(
   input: ArrayBuffer,
 ): Promise<ArrayBuffer> {
-  const entries = await readZipEntries(new Uint8Array(input));
-  let changed = false;
-  for (const entry of entries) {
-    if (!NORMALIZED_PART.test(entry.name)) continue;
-    const xml = textDecoder.decode(entry.bytes);
-    const normalized = decodeNumericCharacterReferences(xml);
-    if (normalized !== xml) {
-      entry.bytes = textEncoder.encode(normalized);
-      changed = true;
-    }
-  }
-  return changed ? writeZipEntries(entries) : input;
+  return transformOfficeZipParts(input, {
+    shouldTransform: (name) => NORMALIZED_PART.test(name),
+    transformXml: (_name, xml) => decodeNumericCharacterReferences(xml),
+  });
 }

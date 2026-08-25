@@ -13,7 +13,7 @@ vi.mock("@extend-ai/react-pptx", () => ({
 }));
 
 import {
-  readZipEntries,
+  readZipParts,
   writeZipEntries,
 } from "../src/renderers/office/officeZipArchive";
 import { PptxRenderer } from "../src/renderers/PptxRenderer";
@@ -175,10 +175,18 @@ describe("PptxRenderer", () => {
       );
     });
 
+    // Normalization inflates and re-deflates on the microtask/macrotask queue,
+    // so wait for the sanitized source to settle before asserting.
+    await act(async () => {
+      for (let i = 0; i < 50 && pptxViewerState.props?.source == null; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    });
+
     const source = pptxViewerState.props?.source as ArrayBuffer;
     expect(source).toBeInstanceOf(ArrayBuffer);
     expect(source).not.toBe(blob);
-    const entries = await readZipEntries(new Uint8Array(source));
+    const entries = await readZipParts(new Uint8Array(source));
     const slide = new TextDecoder().decode(
       entries.find((entry) => entry.name === "ppt/slides/slide1.xml")!.bytes,
     );

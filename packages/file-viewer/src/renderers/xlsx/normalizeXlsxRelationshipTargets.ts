@@ -1,9 +1,4 @@
-import {
-  officeZipTextDecoder as textDecoder,
-  officeZipTextEncoder as textEncoder,
-  readZipEntries,
-  writeZipEntries,
-} from "../office/officeZipArchive";
+import { transformOfficeZipParts } from "../office/officeZipArchive";
 
 function relativePath(fromDirectory: string, target: string): string {
   const fromParts = fromDirectory.split("/").filter(Boolean);
@@ -47,16 +42,8 @@ function normalizeRelationshipXml(xml: string, relationshipPath: string): string
 export async function normalizeXlsxRelationshipTargets(
   input: ArrayBuffer,
 ): Promise<ArrayBuffer> {
-  const entries = await readZipEntries(new Uint8Array(input));
-  let changed = false;
-  for (const entry of entries) {
-    if (!entry.name.toLowerCase().endsWith(".rels")) continue;
-    const xml = textDecoder.decode(entry.bytes);
-    const normalized = normalizeRelationshipXml(xml, entry.name);
-    if (normalized !== xml) {
-      entry.bytes = textEncoder.encode(normalized);
-      changed = true;
-    }
-  }
-  return changed ? writeZipEntries(entries) : input;
+  return transformOfficeZipParts(input, {
+    shouldTransform: (name) => name.toLowerCase().endsWith(".rels"),
+    transformXml: (name, xml) => normalizeRelationshipXml(xml, name),
+  });
 }

@@ -1,82 +1,102 @@
 import { describe, expect, it } from "vitest";
 import {
-  readZipEntries,
-  writeZipEntries,
-  type ZipEntry,
+  readZipParts,
+  transformOfficeZipParts,
 } from "../src/renderers/office/officeZipArchive";
+import { buildZipFixture } from "./support/zipFixtures";
 
-const LOCAL_FILE_HEADER = 0x04034b50;
-const END_OF_CENTRAL_DIRECTORY = 0x06054b50;
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
-function u16(value: number): Uint8Array {
-  return new Uint8Array([value & 0xff, (value >>> 8) & 0xff]);
-}
+const upperTransform = {
+  shouldTransform: (name: string) => name.endsWith(".xml"),
+  transformXml: (_name: string, xml: string) => xml.toUpperCase(),
+};
 
-function u32(value: number): Uint8Array {
-  return new Uint8Array([
-    value & 0xff,
-    (value >>> 8) & 0xff,
-    (value >>> 16) & 0xff,
-    (value >>> 24) & 0xff,
-  ]);
-}
+describe("transformOfficeZipParts", () => {
+  it("only inflates parts it inspects and passes media through untouched", async () => {
+    const media = crypto.getRandomValues(new Uint8Array(64 * 1024)); // incompressible
+    const archive = await buildZipFixture([
+      { name: "ppt/slides/slide1.xml", data: encoder.encode("<a:t>hi</a:t>"), method: 8 },
+      { name: "ppt/media/image1.png", data: media, method: 0 },
+    ]);
 
-function concat(chunks: Uint8Array[]): Uint8Array {
-  const size = chunks.reduce((total, chunk) => total + chunk.length, 0);
-  const out = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return out;
-}
+    const output = await transformOfficeZipParts(archive.buffer as ArrayBuffer, {
+      shouldTransform: (name) => name.startsWith("ppt/slides/"),
+      transformXml: (_name, xml) => xml.replace("hi", "bye"),
+    });
 
-async function deflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
-  const stream = new Blob([bytes as BlobPart])
-    .stream()
-    .pipeThrough(new CompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
-}
+    const parts = await readZipParts(new Uint8Array(output));
+    expect(decoder.decode(parts.find((p) => p.name === "ppt/slides/slide1.xml")!.bytes)).toContain(
+      "bye",
+    );
+    // Media survives byte-for-byte even though the normalizer never inspected it.
+    expect(parts.find((p) => p.name === "ppt/media/image1.png")!.bytes).toEqual(media);
+  });
 
-/** Assemble a single-entry archive whose member is deflate-compressed (method 8). */
-async function buildDeflatedArchive(name: string, data: Uint8Array): Promise<Uint8Array> {
-  const compressed = await deflateRaw(data);
-  const nameBytes = new TextEncoder().encode(name);
-  const localHeader = concat([
-    u32(LOCAL_FILE_HEADER), u16(20), u16(0), u16(8), u16(0), u16(0),
-    u32(0), u32(compressed.length), u32(data.length),
-    u16(nameBytes.length), u16(0), nameBytes,
-  ]);
-  const eocd = concat([u32(END_OF_CENTRAL_DIRECTORY), new Uint8Array(18)]);
-  return concat([localHeader, compressed, eocd]);
-}
+  it("returns the original buffer when no inspected part changes", async () => {
+    const archive = await buildZipFixture([
+      { name: "ppt/slides/slide1.xml", data: encoder.encode("<a:t>hi</a:t>"), method: 8 },
+    ]);
+    const input = archive.buffer as ArrayBuffer;
 
-describe("officeZipArchive inflation cap", () => {
+    const output = await transformOfficeZipParts(input, {
+      shouldTransform: (name) => name.startsWith("ppt/slides/"),
+      transformXml: (_name, xml) => xml, // no change
+    });
+
+    expect(output).toBe(input);
+  });
+
+  it("re-deflates rewritten parts instead of bloating the archive", async () => {
+    const big = encoder.encode("<a:t>" + "spam ".repeat(50_000) + "</a:t>");
+    const archive = await buildZipFixture([{ name: "ppt/slides/slide1.xml", data: big, method: 8 }]);
+    const input = archive.buffer as ArrayBuffer;
+
+    const output = await transformOfficeZipParts(input, upperTransform);
+
+    // A stored (uncompressed) rewrite of 250 KB of text would dwarf the input;
+    // re-deflation keeps the output in the same ballpark.
+    expect(output.byteLength).toBeLessThan(big.length);
+    const parts = await readZipParts(new Uint8Array(output));
+    expect(decoder.decode(parts[0]!.bytes)).toContain("SPAM");
+  });
+
+  it("reads entries written with a streaming data descriptor", async () => {
+    const archive = await buildZipFixture([
+      {
+        name: "ppt/slides/slide1.xml",
+        data: encoder.encode('<a:buChar char="&#x2022;"/>'),
+        method: 8,
+        dataDescriptor: true,
+      },
+    ]);
+
+    const output = await transformOfficeZipParts(archive.buffer as ArrayBuffer, {
+      shouldTransform: (name) => name.endsWith(".xml"),
+      transformXml: (_name, xml) => xml.replace("&#x2022;", "•"),
+    });
+
+    const parts = await readZipParts(new Uint8Array(output));
+    expect(decoder.decode(parts[0]!.bytes)).toContain('char="•"');
+  });
+
   it("refuses a deflated entry that inflates past the cap", async () => {
-    const oneMib = new Uint8Array(1024 * 1024); // all zeros → tiny compressed, large inflated
-    const archive = await buildDeflatedArchive("ppt/slides/slide1.xml", oneMib);
+    const oneMib = new Uint8Array(1024 * 1024); // zeros → tiny compressed, large inflated
+    const archive = await buildZipFixture([{ name: "a.xml", data: oneMib, method: 8 }]);
 
-    await expect(readZipEntries(archive, 64 * 1024)).rejects.toThrow(/inflation limit/i);
+    await expect(
+      transformOfficeZipParts(archive.buffer as ArrayBuffer, {
+        ...upperTransform,
+        maxInflatedBytes: 64 * 1024,
+      }),
+    ).rejects.toThrow(/inflation limit/i);
   });
 
-  it("inflates the same entry when the cap allows it", async () => {
-    const oneMib = new Uint8Array(1024 * 1024);
-    const archive = await buildDeflatedArchive("ppt/slides/slide1.xml", oneMib);
+  it("rejects a malformed central directory", async () => {
+    const archive = await buildZipFixture([{ name: "a.xml", data: encoder.encode("x") }]);
+    archive[archive.length - 6] = 0xff; // corrupt the central-directory offset in the EOCD
 
-    const entries = await readZipEntries(archive, 4 * 1024 * 1024);
-    expect(entries).toHaveLength(1);
-    expect(entries[0]!.name).toBe("ppt/slides/slide1.xml");
-    expect(entries[0]!.bytes.length).toBe(oneMib.length);
-  });
-
-  it("refuses when stored entries together exceed the cap", async () => {
-    const entries: ZipEntry[] = [
-      { name: "a.bin", bytes: new Uint8Array(200 * 1024) },
-      { name: "b.bin", bytes: new Uint8Array(200 * 1024) },
-    ];
-    const archive = new Uint8Array(writeZipEntries(entries));
-
-    await expect(readZipEntries(archive, 256 * 1024)).rejects.toThrow(/inflation limit/i);
+    await expect(readZipParts(archive)).rejects.toThrow(/Invalid Office ZIP/i);
   });
 });
